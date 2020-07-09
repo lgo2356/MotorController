@@ -6,9 +6,11 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.hun.motorcontroller.R
+import com.hun.motorcontroller.data.Device
+import io.reactivex.disposables.Disposable
 import kotlinx.android.synthetic.main.layout_bluetooth_device_item.view.*
 
-class BTDialogRecyclerAdapter(private val items: ArrayList<Devices>) :
+class BTDialogRecyclerAdapter(private val items: ArrayList<Device>) :
     RecyclerView.Adapter<BTDialogRecyclerAdapter.ViewHolder>() {
 
     private var listener: OnItemClickListener? = null
@@ -24,7 +26,7 @@ class BTDialogRecyclerAdapter(private val items: ArrayList<Devices>) :
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.deviceName.text = items[position].devicesName
+        holder.deviceName.text = items[position].deviceName
         holder.deviceAddress.text = items[position].deviceAddress
 
         holder.itemView.setOnClickListener {
@@ -41,11 +43,22 @@ class BTDialogRecyclerAdapter(private val items: ArrayList<Devices>) :
         val deviceAddress: TextView = itemView.textview_device_address
     }
 
-    data class Devices(val devicesName: String, val deviceAddress: String)
-
     fun addItem(name: String, address: String) {
-        val item = Devices(name, address)
+        val item = Device(name, address)
         items.add(item)
+        notifyDataSetChanged()
+    }
+
+    fun removeItem(address: String) {
+        for (item in items) {
+            if (address == item.deviceAddress) {
+                items.remove(item)
+            }
+        }
+    }
+
+    fun getItems(): List<Device> {
+        return this.items
     }
 
     fun setOnItemClickListener(listener: OnItemClickListener) {

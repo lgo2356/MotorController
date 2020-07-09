@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/dialog_container"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:padding="10dp"
-    android:background="#E2E2E2">
+    android:background="#E2E2E2"
+    android:padding="10dp">
 
     <TextView
         android:id="@+id/textview_paired_devices"
@@ -29,6 +30,22 @@
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toBottomOf="@id/paired_divider" />
+
+    <FrameLayout
+        android:id="@+id/cover_paired"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#E2E2E2"
+        app:layout_constraintBottom_toBottomOf="@id/recycler_paired_devices"
+        app:layout_constraintTop_toTopOf="@id/recycler_paired_devices">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="Empty" />
+
+    </FrameLayout>
 
     <TextView
         android:id="@+id/textview_discovered_devices"

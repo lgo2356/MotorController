@@ -1,19 +1,25 @@
 package com.hun.motorcontroller
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.view.View
+import android.util.Log
 import android.widget.Toast
 import androidx.recyclerview.widget.GridLayoutManager
+import com.hun.motorcontroller.data.Motor
+import com.hun.motorcontroller.dialog.BluetoothDialogFragment
+import com.hun.motorcontroller.dialog.MotorSettingDialogFragment
 import com.hun.motorcontroller.recycler_adapter.MotorRecyclerAdapter
+import io.realm.Realm
 import kotlinx.android.synthetic.main.activity_main.*
 
 class MainActivity : AppCompatActivity() {
 
-    private val motorItems: ArrayList<MotorRecyclerAdapter.Motors> = ArrayList()
-    private val motorAdapter: MotorRecyclerAdapter = MotorRecyclerAdapter(motorItems)
+    private val motorAdapter: MotorRecyclerAdapter = MotorRecyclerAdapter()
+    private val motorRealm: Realm = Realm.getDefaultInstance()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -22,12 +28,15 @@ class MainActivity : AppCompatActivity() {
         recycler_motor_buttons.adapter = motorAdapter
         recycler_motor_buttons.layoutManager = GridLayoutManager(this, 2)
 
-        for (i in 0..20) {
-            motorAdapter.addItem("Motor ${i + 1}")
+        motorAdapter.motors = motorRealm.where(Motor::class.java).findAll()
+        motorRealm.addChangeListener { motorAdapter.notifyDataSetChanged() }
+
+        if (motorAdapter.motors.isEmpty()) {
+            val motorSettingDialog = MotorSettingDialogFragment()
+            motorSettingDialog.show(supportFragmentManager, "missiles")
         }
 
         button_bluetooth_setting.setOnClickListener {
-//            BluetoothController(this).activateBluetooth()
             val bluetoothDialog = BluetoothDialogFragment()
             bluetoothDialog.show(supportFragmentManager, "missiles")
         }
@@ -47,5 +56,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+
+        motorRealm.close()
     }
 }

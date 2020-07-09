@@ -6,13 +6,18 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.CheckBox
-import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import com.hun.motorcontroller.R
+import com.hun.motorcontroller.data.Motor
 import kotlinx.android.synthetic.main.layout_motor_control_list.view.*
 
-class MotorRecyclerAdapter(private val items: ArrayList<Motors>) :
-    RecyclerView.Adapter<MotorRecyclerAdapter.ViewHolder>() {
+class MotorRecyclerAdapter : RecyclerView.Adapter<MotorRecyclerAdapter.ViewHolder>() {
+
+    var motors: List<Motor> = listOf()
+        set(value) {
+            field = value
+            notifyDataSetChanged()
+        }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val inflater = LayoutInflater.from(parent.context)
@@ -22,22 +27,15 @@ class MotorRecyclerAdapter(private val items: ArrayList<Motors>) :
 
     @SuppressLint("SetTextI18n")
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.btnMotor.text = "Motor $position"
+        holder.btnMotor.text = motors[position].name
     }
 
     override fun getItemCount(): Int {
-        return items.size
+        return motors.size
     }
 
     class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val chkBox: CheckBox = itemView.chkbox_motor
         val btnMotor: Button = itemView.button_motor
-    }
-
-    data class Motors(val motorName: String)
-
-    fun addItem(name: String) {
-        val item = Motors(name)
-        items.add(item)
     }
 }
