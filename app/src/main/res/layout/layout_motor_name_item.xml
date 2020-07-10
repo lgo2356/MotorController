@@ -11,7 +11,7 @@
         android:layout_height="wrap_content"
         android:hint="모터 이름을 입력하세요."
         android:importantForAutofill="no"
-        android:inputType="none"
+        android:inputType="text"
         app:layout_constraintTop_toTopOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

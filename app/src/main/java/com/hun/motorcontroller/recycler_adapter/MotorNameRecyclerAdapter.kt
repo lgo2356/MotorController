@@ -1,6 +1,7 @@
 package com.hun.motorcontroller.recycler_adapter
 
 import android.annotation.SuppressLint
+import android.hardware.input.InputManager
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -23,7 +24,7 @@ class MotorNameRecyclerAdapter(private val items: ArrayList<Motor>) :
     @SuppressLint("SetTextI18n")
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         // Default Name
-        holder.editMotorName.setText(items[position].name)
+//        holder.editMotorName.setText(items[position].name)
 
         holder.editMotorName.addTextChangedListener {
             items[position].name = holder.editMotorName.text.toString()

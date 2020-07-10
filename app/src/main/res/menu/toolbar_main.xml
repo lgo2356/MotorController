@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_bluetooth_setting"
+        android:title="블루투스 설정"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_motor_preference"
+        android:title="모터 설정"
+        app:showAsAction="never" />
+</menu>

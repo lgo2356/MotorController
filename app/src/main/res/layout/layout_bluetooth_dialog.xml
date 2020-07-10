@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/dialog_container"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="#E2E2E2"
-    android:padding="10dp">
+    android:padding="10dp"
+    tools:ignore="HardCodedText">
 
     <TextView
         android:id="@+id/textview_paired_devices"
@@ -47,27 +49,45 @@
 
     </FrameLayout>
 
-    <TextView
-        android:id="@+id/textview_discovered_devices"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/container_textview_discovered_devices"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="검색된 디바이스"
-        app:layout_constraintTop_toBottomOf="@id/recycler_paired_devices" />
+        app:layout_constraintTop_toBottomOf="@id/recycler_paired_devices">
 
-    <View
-        android:id="@+id/discovered_divider"
-        android:layout_width="match_parent"
-        android:layout_height="0.5dp"
-        android:layout_marginTop="2dp"
-        android:background="@color/colorDivider"
-        app:layout_constraintTop_toBottomOf="@id/textview_discovered_devices" />
+        <TextView
+            android:id="@+id/textview_discovered_devices"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="검색된 디바이스"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <ImageView
+            android:id="@+id/imageview_loading_icon"
+            android:layout_width="15dp"
+            android:layout_height="15dp"
+            android:layout_marginRight="10dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <View
+            android:id="@+id/discovered_divider"
+            android:layout_width="match_parent"
+            android:layout_height="0.5dp"
+            android:layout_marginTop="2dp"
+            android:background="@color/colorDivider"
+            app:layout_constraintTop_toBottomOf="@id/textview_discovered_devices" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_discovered_devices"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="5dp"
-        app:layout_constraintTop_toBottomOf="@id/discovered_divider" />
+        app:layout_constraintTop_toBottomOf="@id/container_textview_discovered_devices" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

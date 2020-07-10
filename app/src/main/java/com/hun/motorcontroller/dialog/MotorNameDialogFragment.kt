@@ -2,8 +2,11 @@ package com.hun.motorcontroller.dialog
 
 import android.app.AlertDialog
 import android.app.Dialog
+import android.content.Context
+import android.hardware.input.InputManager
 import android.os.Bundle
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import androidx.fragment.app.DialogFragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -17,29 +20,28 @@ class MotorNameDialogFragment : DialogFragment() {
 
     private val motors = ArrayList<Motor>()
     private val motorNameRecyclerAdapter = MotorNameRecyclerAdapter(motors)
+//    private var motorNameRecycler: RecyclerView? = null
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-        return activity?.let { fragmentActivity ->
-            val builder = AlertDialog.Builder(fragmentActivity)
-            val inflater = requireActivity().layoutInflater
-            val view: View = inflater.inflate(R.layout.layout_motor_name_dialog, null)
-            val motorNameRecycler = view.findViewById<RecyclerView>(R.id.recycler_motor_name)
+        val inflater = requireActivity().layoutInflater
+        val layout: View = inflater.inflate(R.layout.layout_motor_name_dialog, null)
+        val motorNameRecycler: RecyclerView = layout.findViewById(R.id.recycler_motor_name)
 
-            motorNameRecycler.adapter = motorNameRecyclerAdapter
-            motorNameRecycler.layoutManager = LinearLayoutManager(context)
+        motorNameRecycler.adapter = motorNameRecyclerAdapter
+        motorNameRecycler.layoutManager = LinearLayoutManager(context)
 
-            val count: Int = arguments?.getInt("count") ?: 0
-            // Default name
-            for (i in 0 until count) motorNameRecyclerAdapter.addItem("Motor ${i + 1}")
+        val count: Int = arguments?.getInt("count") ?: 0
+        for (i in 0 until count) motorNameRecyclerAdapter.addItem("")
 
-            builder
-                .setView(view)
-                .setTitle("모터 이름 설정")
-                .setPositiveButton("확인") { _, _ ->
-                    for (i in 0 until count) {
-                        val motorName = motorNameRecyclerAdapter.getName(i)
-                        setMotorName(motorName)
-                    }
+        val builder = AlertDialog.Builder(activity)
+        builder
+            .setView(layout)
+            .setTitle("모터 이름 설정")
+            .setPositiveButton("확인") { _, _ ->
+                for (i in 0 until count) {
+                    val motorName = motorNameRecyclerAdapter.getName(i)
+                    setMotorName(motorName)
+                }
 //                    (fragmentActivity as MainActivity).getMotorAdapter()?.apply {
 //                        for (i in 0 until count) {
 //                            val motorName = motorNameRecyclerAdapter.getName(i)
@@ -50,10 +52,10 @@ class MotorNameDialogFragment : DialogFragment() {
 ////                            } ?: this.addItem("Empty Name")
 //                        }
 //                    }
-                }
-                .setNegativeButton("취소") { _, _ -> }
-                .create()
-        } ?: throw IllegalAccessException("Activity cannot be null")
+            }
+            .setNegativeButton("취소") { _, _ -> }
+
+        return builder.create()
     }
 
     private fun setMotorName(name: String) {
