@@ -39,7 +39,9 @@ import io.reactivex.Scheduler
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
+import kotlinx.android.synthetic.main.layout_bluetooth_device_item.view.*
 import java.io.IOException
+import java.lang.IllegalArgumentException
 import java.lang.IllegalStateException
 import java.lang.reflect.Method
 import java.util.*
@@ -54,9 +56,10 @@ class BluetoothDialogFragment : DialogFragment() {
     private val btDialogDiscoveredAdapter = BTDialogRecyclerAdapter(btDiscoveredDevices)
     private var bluetoothAdapter: BluetoothAdapter? = null
     private var broadcastReceiver: BroadcastReceiver? = null
+    private var disposable: Disposable? = null
 
     private var fragmentActivity: FragmentActivity? = null
-    private lateinit var loadingIcon: ImageView
+    private lateinit var deviceScanningProgress: ImageView
 
 //    private var thread: com.hun.motorcontroller.ConnectThread? = null
 //    private var thread: ConnectThread? = null
@@ -69,15 +72,15 @@ class BluetoothDialogFragment : DialogFragment() {
             activateBluetooth()
             registerBluetoothReceive()
 
-            val builder = AlertDialog.Builder(fragmentActivity)
+            val builder = AlertDialog.Builder(fragmentActivity, R.style.DialogTheme)
             val inflater = requireActivity().layoutInflater
             val view: View = inflater.inflate(R.layout.layout_bluetooth_dialog, null)
 
             val pairedDevicesRecycler = view.findViewById<RecyclerView>(R.id.recycler_paired_devices)
             val discoveredDevicesRecycler = view.findViewById<RecyclerView>(R.id.recycler_discovered_devices)
-            val pairedDeviceCover = view.findViewById<FrameLayout>(R.id.cover_paired)
-            loadingIcon = view.findViewById(R.id.imageview_loading_icon)
-            Glide.with(this).asGif().load(R.raw.loading02).into(loadingIcon)
+//            val pairedDeviceCover = view.findViewById<FrameLayout>(R.id.cover_paired)
+            deviceScanningProgress = view.findViewById(R.id.image_device_scanning_progress)
+            Glide.with(this).asGif().load(R.raw.loading02).into(deviceScanningProgress)
 
             pairedDevicesRecycler.adapter = btDialogPairedAdapter
             pairedDevicesRecycler.layoutManager = LinearLayoutManager(context)
@@ -85,14 +88,19 @@ class BluetoothDialogFragment : DialogFragment() {
             discoveredDevicesRecycler.layoutManager = LinearLayoutManager(context)
 
             // Get paired devices ...
-            getPairedDevices()?.let {
-                if (it.isNotEmpty()) pairedDeviceCover.visibility = View.GONE
-                else {
-                    pairedDeviceCover.visibility = View.VISIBLE
+            val pairedDevices = getPairedDevices()
+            if (pairedDevices != null) {
+                for (device in pairedDevices) {
+                    btDialogPairedAdapter.addItem(device.name, device.address)
                 }
+            }
 
-                for (device in it) btDialogPairedAdapter.addItem(device.name, device.address)
-            } ?: setPairedEmpty(pairedDeviceCover)
+            // Test
+//            btDialogPairedAdapter.addItem("Name", "Address")
+//            btDialogPairedAdapter.addItem("Name", "Address")
+//            btDialogDiscoveredAdapter.addItem("Name", "Address")
+//            btDialogDiscoveredAdapter.addItem("Name", "Address")
+//            btDialogDiscoveredAdapter.addItem("Name", "Address")
 
             scanBluetoothDevices()
 
@@ -104,7 +112,9 @@ class BluetoothDialogFragment : DialogFragment() {
                         val deviceAddress = devices[position].deviceAddress
                         val device = bluetoothAdapter?.getRemoteDevice(deviceAddress)
 
+                        view.image_device_connecting_progress.visibility = View.VISIBLE
                         val socket = getConnectedSocket(device!!)
+//                        view.image_device_connecting_progress.visibility = View.GONE
                     }
                 })
 
@@ -166,7 +176,7 @@ class BluetoothDialogFragment : DialogFragment() {
         }
     }
 
-    // Bluetooth receiver actions 핸들링
+    // Bluetooth receiver actions 처리
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
@@ -189,21 +199,18 @@ class BluetoothDialogFragment : DialogFragment() {
 
                 BluetoothAdapter.ACTION_DISCOVERY_STARTED -> {
                     Log.d("Receiver Action", "ACTION DISCOVERY STARTED")
-                    loadingIcon.visibility = View.VISIBLE
+                    deviceScanningProgress.visibility = View.VISIBLE
                 }
 
                 BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
                     Log.d("Receiver Action", "ACTION DISCOVERY FINISHED")
-                    loadingIcon.visibility = View.INVISIBLE
+                    deviceScanningProgress.visibility = View.INVISIBLE
                 }
 
-                null -> { }
+                null -> {
+                }
             }
         }
-    }
-
-    private fun progressOn() {
-
     }
 
     private fun isPairedDevice(address: String): Boolean {
@@ -268,50 +275,33 @@ class BluetoothDialogFragment : DialogFragment() {
     }
 
     private fun setConnectionIconToConnected() {
-        val icon: ImageView? = activity?.findViewById(R.id.imgview_bluetooth_check)
+        val icon: ImageView? = activity?.findViewById(R.id.image_lamp)
         icon?.setImageResource(R.drawable.bluetooth_state_connected_shape)
     }
 
     private fun getConnectedSocket(device: BluetoothDevice): BluetoothSocket? {
         val bluetoothSocket = device.createRfcommSocketToServiceRecord(Constants.UUID_SERIAL_PORT)
 
-        val observable = Observable.just(bluetoothSocket)
+        disposable = Observable.just(bluetoothSocket)
             .subscribeOn(Schedulers.io())
+            .doOnNext { socket ->
+                bluetoothAdapter?.cancelDiscovery()
+                socket.connect()
+            }
+            .observeOn(AndroidSchedulers.mainThread())
+            .doOnNext {
+                Toast.makeText(activity, "성공적으로 연결되었습니다.", Toast.LENGTH_SHORT).show()
+            }
             .doOnComplete {
                 setConnectionIconToConnected()
                 this.dismiss()
             }
-            .doOnError {
-
+            .doOnError { e ->
+                Log.e("onError", e.message)
             }
-            .subscribe { socket ->
-                bluetoothAdapter?.cancelDiscovery()
-                socket.connect()
-            }
+            .subscribe()
 
         return bluetoothSocket
-    }
-
-    class ConnectThread(device: BluetoothDevice, adapter: BluetoothAdapter?) : Thread() {
-
-        private var mmSocket: BluetoothSocket? =
-            device.createRfcommSocketToServiceRecord(Constants.UUID_SERIAL_PORT)
-        private val adapter = adapter
-        val device = device
-
-        override fun run() {
-            this.adapter?.cancelDiscovery()
-
-            try {
-                mmSocket?.connect()
-            } catch (e: IOException) {
-                e.printStackTrace()
-            }
-
-//            mSocket?.use { socket ->
-//                socket.connect()
-//            }
-        }
     }
 
     // Return paired devices as Set
@@ -329,8 +319,15 @@ class BluetoothDialogFragment : DialogFragment() {
 
     override fun onStop() {
         super.onStop()
+
+        disposable?.dispose()
         bluetoothAdapter?.cancelDiscovery()
-        fragmentActivity?.unregisterReceiver(receiver)
+
+        try {
+            fragmentActivity?.unregisterReceiver(receiver)
+        } catch (e: IllegalArgumentException) {
+            e.printStackTrace()
+        }
     }
 
     override fun onRequestPermissionsResult(

@@ -3,8 +3,10 @@ package com.hun.motorcontroller.recycler_adapter
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.hun.motorcontroller.R
 import com.hun.motorcontroller.data.Device
 import io.reactivex.disposables.Disposable
@@ -27,7 +29,8 @@ class BTDialogRecyclerAdapter(private val items: ArrayList<Device>) :
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         holder.deviceName.text = items[position].deviceName
-        holder.deviceAddress.text = items[position].deviceAddress
+//        holder.deviceAddress.text = items[position].deviceAddress
+        Glide.with(holder.itemView).asGif().load(R.raw.loading02).into(holder.deviceConnectingProgress)
 
         holder.itemView.setOnClickListener {
             listener?.onItemClick(it, position)
@@ -40,21 +43,14 @@ class BTDialogRecyclerAdapter(private val items: ArrayList<Device>) :
 
     class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val deviceName: TextView = itemView.textview_device_name
-        val deviceAddress: TextView = itemView.textview_device_address
+//        val deviceAddress: TextView = itemView.textview_device_address
+        val deviceConnectingProgress: ImageView = itemView.image_device_connecting_progress
     }
 
     fun addItem(name: String, address: String) {
         val item = Device(name, address)
         items.add(item)
         notifyDataSetChanged()
-    }
-
-    fun removeItem(address: String) {
-        for (item in items) {
-            if (address == item.deviceAddress) {
-                items.remove(item)
-            }
-        }
     }
 
     fun getItems(): List<Device> {

@@ -11,6 +11,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
+import androidx.appcompat.widget.PopupMenu
 import androidx.recyclerview.widget.GridLayoutManager
 import com.hun.motorcontroller.data.Motor
 import com.hun.motorcontroller.dialog.BluetoothDialogFragment
@@ -28,9 +29,10 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         setSupportActionBar(toolbar_main)
+        supportActionBar?.setDisplayShowTitleEnabled(false)
 
         recycler_motor_buttons.adapter = motorAdapter
-        recycler_motor_buttons.layoutManager = GridLayoutManager(this, 2)
+//        recycler_motor_buttons.layoutManager = GridLayoutManager(this, 2)
 
         motorAdapter.motors = motorRealm.where(Motor::class.java).findAll()
         motorRealm.addChangeListener { motorAdapter.notifyDataSetChanged() }
@@ -38,11 +40,6 @@ class MainActivity : AppCompatActivity() {
         if (motorAdapter.motors.isEmpty()) {
             val motorSettingDialog = MotorSettingDialogFragment()
             motorSettingDialog.show(supportFragmentManager, "missiles")
-        }
-
-        button_bluetooth_setting.setOnClickListener {
-            val bluetoothDialog = BluetoothDialogFragment()
-            bluetoothDialog.show(supportFragmentManager, "missiles")
         }
     }
 
@@ -64,6 +61,8 @@ class MainActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.action_bluetooth_setting -> {
+                val bluetoothDialog = BluetoothDialogFragment()
+                bluetoothDialog.show(supportFragmentManager, "missiles")
                 true
             }
 
