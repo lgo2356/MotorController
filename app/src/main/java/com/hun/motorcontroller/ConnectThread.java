@@ -1,44 +1,37 @@
 package com.hun.motorcontroller;
 
-import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.util.Log;
 
-import java.io.IOException;
+import com.hun.motorcontroller.data.BTSocket;
+
 import java.lang.reflect.Method;
 import java.util.UUID;
 
 public class ConnectThread extends Thread {
-    private final BluetoothSocket mmSocket;
-    private final BluetoothDevice mmDevice;
-    private final BluetoothAdapter mmAdapter;
 
-    public ConnectThread(BluetoothDevice device, BluetoothAdapter adapter) {
-        BluetoothSocket tmp = null;
-        mmDevice = device;
-        mmAdapter = adapter;
+    private final BluetoothDevice mDevice;
+    private final UUID uuid = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
-        try {
-            final Method method = device.getClass().getMethod("createInsecureRfcommSocket", int.class);
-            tmp = (BluetoothSocket) method.invoke(device, 1);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        mmSocket = tmp;
+    public ConnectThread(BluetoothDevice device) {
+        mDevice = device;
     }
 
+    @Override
     public void run() {
-        mmAdapter.cancelDiscovery();
-
         try {
-            mmSocket.connect();
-        } catch (IOException e) {
-            try {
-                mmSocket.close();
-            } catch (IOException ioe) {
-                ioe.printStackTrace();
-            }
+            Method createMethod = mDevice.getClass()
+                    .getMethod("createInsecureRfcommSocket", new Class[]{int.class});
+            BluetoothSocket mSocket = (BluetoothSocket) createMethod.invoke(mDevice, 1);
 
+            if (mSocket != null) {
+                mSocket.connect();
+                BTSocket.Companion.setSocket(mSocket);
+            } else {
+                Log.e("Debug", "Couldn't connect to your device.");
+            }
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }

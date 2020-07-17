@@ -12,15 +12,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.Toast
-import androidx.annotation.RequiresApi
-import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.DialogFragment
@@ -28,23 +25,17 @@ import androidx.fragment.app.FragmentActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
-import com.hun.motorcontroller.ConnectThread
-import com.hun.motorcontroller.Constants
-import com.hun.motorcontroller.ObservableList
-import com.hun.motorcontroller.R
+import com.hun.motorcontroller.*
+import com.hun.motorcontroller.data.BTSocket
 import com.hun.motorcontroller.data.Device
 import com.hun.motorcontroller.recycler_adapter.BTDialogRecyclerAdapter
 import io.reactivex.Observable
-import io.reactivex.Scheduler
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
 import kotlinx.android.synthetic.main.layout_bluetooth_device_item.view.*
-import java.io.IOException
 import java.lang.IllegalArgumentException
 import java.lang.IllegalStateException
-import java.lang.reflect.Method
-import java.util.*
 import kotlin.collections.ArrayList
 
 class BluetoothDialogFragment : DialogFragment() {
@@ -114,7 +105,12 @@ class BluetoothDialogFragment : DialogFragment() {
 
                         view.image_device_connecting_progress.visibility = View.VISIBLE
                         val socket = getConnectedSocket(device!!)
-//                        view.image_device_connecting_progress.visibility = View.GONE
+
+                        if (socket != null) {
+                            BTSocket.socket = socket
+                            BTSocket.inputStream = socket.inputStream
+                            BTSocket.outputStream = socket.outputStream
+                        }
                     }
                 })
 
@@ -126,7 +122,7 @@ class BluetoothDialogFragment : DialogFragment() {
                         val deviceAddress = devices[position].deviceAddress
                         val device = bluetoothAdapter?.getRemoteDevice(deviceAddress)
 
-                        val socket = getConnectedSocket(device!!)
+                        val socket: BluetoothSocket? = getConnectedSocket(device!!)
                     }
                 })
 
@@ -280,13 +276,16 @@ class BluetoothDialogFragment : DialogFragment() {
     }
 
     private fun getConnectedSocket(device: BluetoothDevice): BluetoothSocket? {
+
         val bluetoothSocket = device.createRfcommSocketToServiceRecord(Constants.UUID_SERIAL_PORT)
 
         disposable = Observable.just(bluetoothSocket)
             .subscribeOn(Schedulers.io())
             .doOnNext { socket ->
                 bluetoothAdapter?.cancelDiscovery()
-                socket.connect()
+                val connectThread = ConnectThread(device)
+                connectThread.start()
+//                socket.connect()
             }
             .observeOn(AndroidSchedulers.mainThread())
             .doOnNext {

@@ -37,6 +37,10 @@ class MotorRecyclerAdapter : RecyclerView.Adapter<MotorRecyclerAdapter.ViewHolde
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         holder.textMotorName.text = motors[position].name
 
+        holder.itemView.setOnClickListener {
+            listener?.onItemClick(it, position)
+        }
+
         holder.imageBin.setOnClickListener {
             deleteMotor(position)
         }
