@@ -13,6 +13,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
 import android.util.Log
 import android.view.View
 import android.widget.FrameLayout
@@ -34,11 +35,12 @@ import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
 import kotlinx.android.synthetic.main.layout_bluetooth_device_item.view.*
+import java.io.IOException
 import java.lang.IllegalArgumentException
 import java.lang.IllegalStateException
 import kotlin.collections.ArrayList
 
-class BluetoothDialogFragment : DialogFragment() {
+class BluetoothDialogFragment(private val handler: Handler) : DialogFragment() {
 
     private val btPairedDevices: ArrayList<Device> = ArrayList()
     private val btDiscoveredDevices: ArrayList<Device> = ArrayList()
@@ -47,10 +49,12 @@ class BluetoothDialogFragment : DialogFragment() {
     private val btDialogDiscoveredAdapter = BTDialogRecyclerAdapter(btDiscoveredDevices)
     private var bluetoothAdapter: BluetoothAdapter? = null
     private var broadcastReceiver: BroadcastReceiver? = null
-    private var disposable: Disposable? = null
+    private var connectDisposable: Disposable? = null
 
     private var fragmentActivity: FragmentActivity? = null
     private lateinit var deviceScanningProgress: ImageView
+
+    private var isConnecting = false
 
 //    private var thread: com.hun.motorcontroller.ConnectThread? = null
 //    private var thread: ConnectThread? = null
@@ -101,15 +105,13 @@ class BluetoothDialogFragment : DialogFragment() {
                     override fun onItemClick(view: View, position: Int) {
                         val devices = btDialogPairedAdapter.getItems()
                         val deviceAddress = devices[position].deviceAddress
-                        val device = bluetoothAdapter?.getRemoteDevice(deviceAddress)
 
-                        view.image_device_connecting_progress.visibility = View.VISIBLE
-                        val socket = getConnectedSocket(device!!)
-
-                        if (socket != null) {
-                            BTSocket.socket = socket
-                            BTSocket.inputStream = socket.inputStream
-                            BTSocket.outputStream = socket.outputStream
+                        // 프로그래스 이미지 처리 방법 고민해보기
+                        bluetoothAdapter?.getRemoteDevice(deviceAddress)?.let {
+                            if (connectDisposable == null) {
+                                if (BTSocket.socket == null)
+                                    connectToSocket(it)
+                            }
                         }
                     }
                 })
@@ -120,9 +122,15 @@ class BluetoothDialogFragment : DialogFragment() {
                     override fun onItemClick(view: View, position: Int) {
                         val devices = btDialogDiscoveredAdapter.getItems()
                         val deviceAddress = devices[position].deviceAddress
-                        val device = bluetoothAdapter?.getRemoteDevice(deviceAddress)
 
-                        val socket: BluetoothSocket? = getConnectedSocket(device!!)
+                        bluetoothAdapter?.getRemoteDevice(deviceAddress)?.let {
+                            view.image_device_connecting_progress.visibility = View.VISIBLE
+                            if (connectDisposable == null) {
+                                if (BTSocket.socket == null) {
+                                    connectToSocket(it)
+                                }
+                            }
+                        }
                     }
                 })
 
@@ -275,32 +283,62 @@ class BluetoothDialogFragment : DialogFragment() {
         icon?.setImageResource(R.drawable.bluetooth_state_connected_shape)
     }
 
-    private fun getConnectedSocket(device: BluetoothDevice): BluetoothSocket? {
+    private fun setConnectionIconToDisconnected() {
+        val icon: ImageView? = activity?.findViewById(R.id.image_lamp)
+        icon?.setImageResource(R.drawable.bluetooth_state_disconnected_shape)
+    }
 
-        val bluetoothSocket = device.createRfcommSocketToServiceRecord(Constants.UUID_SERIAL_PORT)
+    private fun connectToSocket(device: BluetoothDevice) {
+//        bluetoothAdapter?.cancelDiscovery()
+//        val connectThread = ConnectThread(device)
+//        connectThread.start()
+//        val connectThread = BluetoothService().ConnectThread(device)
+//        connectThread.start()
+//
+//        val createMethod =
+//            device.javaClass.getMethod(
+//                "createInsecureRfcommSocket",
+//                *arrayOf<Class<*>?>(Int::class.javaPrimitiveType)
+//            )
+//        val socket = createMethod.invoke(device, 1) as BluetoothSocket
+        Log.d("Debug", "aaa")
+        view.image_device_connecting_progress.visibility = View.VISIBLE
 
-        disposable = Observable.just(bluetoothSocket)
+        val socket = device.createInsecureRfcommSocketToServiceRecord(Constants.UUID_SERIAL_PORT)
+
+        connectDisposable = Observable.just(socket)
             .subscribeOn(Schedulers.io())
-            .doOnNext { socket ->
-                bluetoothAdapter?.cancelDiscovery()
-                val connectThread = ConnectThread(device)
-                connectThread.start()
-//                socket.connect()
-            }
-            .observeOn(AndroidSchedulers.mainThread())
             .doOnNext {
-                Toast.makeText(activity, "성공적으로 연결되었습니다.", Toast.LENGTH_SHORT).show()
+                try {
+                    bluetoothAdapter?.cancelDiscovery()
+                    it.connect()
+                    BTSocket.socket = it
+                    BTSocket.inputStream = it.inputStream
+                    BTSocket.outputStream = it.outputStream
+
+                    handler.sendEmptyMessage(Constants.MESSAGE_CONNECTED)
+                    setConnectionIconToConnected()
+                } catch (e: IOException) {
+                    Log.d("Debug", "Couldn't connect to your device", e)
+                    val errorMsg = handler.obtainMessage(Constants.MESSAGE_TOAST, "블루투스 연결에 실패했습니다")
+                    errorMsg.sendToTarget()
+
+                    if (BTSocket.socket?.isConnected!!) {
+                        BTSocket.socket?.close()
+                    } else {
+                        setConnectionIconToDisconnected()
+                    }
+                } catch (e: UninitializedPropertyAccessException) {
+                    e.printStackTrace()
+                }
             }
             .doOnComplete {
-                setConnectionIconToConnected()
                 this.dismiss()
             }
-            .doOnError { e ->
-                Log.e("onError", e.message)
+            .doOnError {
+                throw it
             }
             .subscribe()
-
-        return bluetoothSocket
     }
 
     // Return paired devices as Set
@@ -319,7 +357,7 @@ class BluetoothDialogFragment : DialogFragment() {
     override fun onStop() {
         super.onStop()
 
-        disposable?.dispose()
+        connectDisposable?.dispose()
         bluetoothAdapter?.cancelDiscovery()
 
         try {

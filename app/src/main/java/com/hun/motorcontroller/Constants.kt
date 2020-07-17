@@ -12,6 +12,8 @@ class Constants {
         const val MESSAGE_READ: Int = 0
         const val MESSAGE_WRITE: Int = 1
         const val MESSAGE_TOAST: Int = 2
+        const val MESSAGE_PROGRESS: Int = 3
+        const val MESSAGE_CONNECTED: Int = 4
 
         val UUID_SERIAL_PORT: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
     }

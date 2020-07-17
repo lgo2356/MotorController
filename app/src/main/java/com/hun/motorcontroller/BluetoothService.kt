@@ -1,98 +1,121 @@
 package com.hun.motorcontroller
 
-import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import android.os.Bundle
 import android.os.Handler
+import android.os.Message
 import android.util.Log
 import com.hun.motorcontroller.data.BTSocket
 import java.io.IOException
-import java.io.InputStream
-import java.io.OutputStream
+import java.io.UnsupportedEncodingException
+import java.lang.Exception
+import java.nio.charset.StandardCharsets.US_ASCII
 
-class BluetoothService(private val handler: Handler) {
+class BluetoothService {
 
-    private var socket: BluetoothSocket? = null
-
-    private inner class ConnectThread(device: BluetoothDevice, btAdapter: BluetoothAdapter) : Thread() {
-
-        private val socket: BluetoothSocket? =
-            device.createRfcommSocketToServiceRecord(Constants.UUID_SERIAL_PORT)
-        private val bluetoothAdapter: BluetoothAdapter? = btAdapter
-
-        private val device = device
+    private inner class ConnectThread(private val device: BluetoothDevice) : Thread() {
 
         override fun run() {
-            bluetoothAdapter?.cancelDiscovery()
-
-            val createMethod = device.javaClass.getMethod("createInsecureRfcommSocket")
-
-            socket?.use {
-                try {
-                    socket.connect()
-                    BTSocket.socket = socket
-                    BTSocket.inputStream = socket.inputStream
-                    BTSocket.outputStream = socket.outputStream
-                } catch (e: IOException) {
-                    Log.d("Debug", "Failed to connect")
-                }
-            }
-        }
-
-        fun cancel() {
             try {
-                socket?.close()
-            } catch (e: IOException) {
-                Log.e("Debug", "Could not close the client socket", e)
+                val createMethod = device.javaClass
+                    .getMethod(
+                        "createInsecureRfcommSocket",
+                        *arrayOf<Class<*>?>(Int::class.javaPrimitiveType)
+                    )
+                val socket = createMethod.invoke(device, 1) as BluetoothSocket
+                socket.connect()
+
+                BTSocket.socket = socket
+                BTSocket.inputStream = socket.inputStream
+                BTSocket.outputStream = socket.outputStream
+            } catch (e: Exception) {
+                Log.e("Debug", "Couldn't connect to your device")
+                e.printStackTrace()
             }
         }
     }
 
-    inner class IOThread(socket: BluetoothSocket) : Thread() {
+    inner class IOThread(private val handler: Handler) : Thread() {
 
-        private val inputStream: InputStream = socket.inputStream
-        private val outputStream: OutputStream = socket.outputStream
         private val buffer: ByteArray = ByteArray(1024)
+        private var bufferPosition = 0
+        private val delimiter: Byte = 0x0A
 
         override fun run() {
-            var numBytes: Int
+//            val b: Byte = 0x0A
+//            val msg = handler.obtainMessage(Constants.MESSAGE_READ, b)
+//            msg.sendToTarget()
 
-            while (true) {
-                numBytes = try {
-                    inputStream.read(buffer)
-                } catch (e: IOException) {
-                    Log.d("Debug", "Input stream was disconnected", e)
-                    break
+            try {
+                while (true) {
+                    val bytesAvailable = BTSocket.inputStream?.available()!!
+
+                    if (bytesAvailable > 0) {
+                        val packetBytes = ByteArray(bytesAvailable)
+                        BTSocket.inputStream?.read(packetBytes)
+
+                        for (i in 0 until bytesAvailable) {
+                            val byte: Byte = packetBytes[i]
+
+                            if (byte == delimiter) {
+                                val encodedBytes = ByteArray(bufferPosition)
+                                System.arraycopy(buffer, 0, encodedBytes, 0, encodedBytes.size)
+
+                                val readString = String(encodedBytes, US_ASCII)
+                                bufferPosition = 0
+
+                                val readMsg = handler.obtainMessage(Constants.MESSAGE_READ, readString)
+                                readMsg.sendToTarget()
+                            } else {
+                                buffer[bufferPosition++] = byte
+                            }
+                        }
+                    }
                 }
-
-                val readMsg = handler.obtainMessage(Constants.MESSAGE_READ, numBytes, -1, buffer)
-                readMsg.sendToTarget()
+            } catch (e: IOException) {
+                Log.d("Debug", "Input stream was disconnected", e)
+            } catch (e: UnsupportedEncodingException) {
+                Log.d("Debug", "Unsupported encoding format", e)
             }
+
+
+//            var numBytes: Int
+//            numBytes = try {
+//                BTSocket.inputStream.read(buffer)
+//            } catch (e: IOException) {
+//                Log.d("Debug", "Input stream was disconnected", e)
+//                break
+//            }
+//
+//            val readMsg: Message = handler.obtainMessage(Constants.MESSAGE_READ, numBytes, -1, buffer)
+//            readMsg.sendToTarget()
         }
 
         fun write(bytes: ByteArray) {
             try {
 //                outputStream.write(bytes)
-                outputStream.write(1)
+                val isConnected: Boolean
+                BTSocket.outputStream?.write(1)
+
+                val readMsg = handler.obtainMessage(Constants.MESSAGE_READ, bytes)
+                readMsg.sendToTarget()
             } catch (e: IOException) {
                 Log.e("Debug", "Error occurred when sending data", e)
 
-                val writeErrorMsg = handler.obtainMessage(Constants.MESSAGE_TOAST)
-                val bundle = Bundle().apply {
-                    putString("toast", "Couldn't send data to the other device.")
-                }
-                writeErrorMsg.data = bundle
-                handler.sendMessage(writeErrorMsg)
-                return
-            }
-        }
+//                val writeErrorMsg = handler.obtainMessage(Constants.MESSAGE_TOAST)
+//                val bundle = Bundle().apply {
+//                    putString("toast", "Couldn't send data to the other device.")
+//                }
+//                writeErrorMsg.data = bundle
+//                handler.sendMessage(writeErrorMsg)
 
-        fun cancel() {
-            try {
-                BTSocket.socket?.close()
-            } catch (e: IOException) {
-                Log.e("Debug", "Could not close the connect socket", e)
+                val errorMessage = handler.obtainMessage(Constants.MESSAGE_TOAST, "데이터 전송에 실패했습니다")
+                errorMessage.sendToTarget()
+            } catch (e: UninitializedPropertyAccessException) {
+                e.printStackTrace()
+                val errorMessage = handler.obtainMessage(Constants.MESSAGE_TOAST, "블루투스를 연결해 주세요")
+                errorMessage.sendToTarget()
             }
         }
     }
