@@ -2,41 +2,57 @@ package com.hun.motorcontroller
 
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
-import android.os.Bundle
 import android.os.Handler
-import android.os.Message
 import android.util.Log
-import com.hun.motorcontroller.data.BTSocket
+import android.widget.Toast
 import java.io.IOException
 import java.io.UnsupportedEncodingException
 import java.lang.Exception
 import java.nio.charset.StandardCharsets.US_ASCII
 
-class BluetoothService {
+class BluetoothService(private val handler: Handler, private val device: BluetoothDevice) {
 
-    private inner class ConnectThread(private val device: BluetoothDevice) : Thread() {
+    private var mSocket: BluetoothSocket? = null
+//    private val mDevice: BluetoothDevice = device
+
+    inner class ConnectThread : Thread() {
 
         override fun run() {
             try {
-                val createMethod = device.javaClass
-                    .getMethod(
-                        "createInsecureRfcommSocket",
-                        *arrayOf<Class<*>?>(Int::class.javaPrimitiveType)
-                    )
-                val socket = createMethod.invoke(device, 1) as BluetoothSocket
-                socket.connect()
+//                val createMethod = device.javaClass
+//                    .getMethod(
+//                        "createInsecureRfcommSocket",
+//                        *arrayOf<Class<*>?>(Int::class.javaPrimitiveType)
+//                    )
+//                val socket = createMethod.invoke(device, 1) as BluetoothSocket
+//                BTSocket.socket = socket
+//                BTSocket.inputStream = socket.inputStream
+//                BTSocket.outputStream = socket.outputStream
 
-                BTSocket.socket = socket
-                BTSocket.inputStream = socket.inputStream
-                BTSocket.outputStream = socket.outputStream
+
+                mSocket = device.createInsecureRfcommSocketToServiceRecord(Constants.UUID_SERIAL_PORT)
+                mSocket?.connect()
+                handler.sendEmptyMessage(Constants.MESSAGE_CONNECTED)
             } catch (e: Exception) {
                 Log.e("Debug", "Couldn't connect to your device")
                 e.printStackTrace()
+
+                val errorMsg = handler.obtainMessage(Constants.MESSAGE_TOAST, "블루투스 연결에 실패했습니다")
+                errorMsg.sendToTarget()
+                handler.sendEmptyMessage(Constants.MESSAGE_ERROR)
+            }
+        }
+
+        fun cancel() {
+            try {
+                mSocket?.close()
+            } catch (e: IOException) {
+                Log.d("Debug", "Couldn't close the client socket", e)
             }
         }
     }
 
-    inner class IOThread(private val handler: Handler) : Thread() {
+    inner class IOThread : Thread() {
 
         private val buffer: ByteArray = ByteArray(1024)
         private var bufferPosition = 0
@@ -49,11 +65,13 @@ class BluetoothService {
 
             try {
                 while (true) {
-                    val bytesAvailable = BTSocket.inputStream?.available()!!
+//                    val bytesAvailable = BTS.inputStream?.available()!!
+                    val bytesAvailable = mSocket?.inputStream?.available()!!
 
                     if (bytesAvailable > 0) {
                         val packetBytes = ByteArray(bytesAvailable)
-                        BTSocket.inputStream?.read(packetBytes)
+//                        BTS.inputStream?.read(packetBytes)
+                        mSocket?.inputStream?.read(packetBytes)
 
                         for (i in 0 until bytesAvailable) {
                             val byte: Byte = packetBytes[i]
@@ -75,8 +93,16 @@ class BluetoothService {
                 }
             } catch (e: IOException) {
                 Log.d("Debug", "Input stream was disconnected", e)
+                val errorMsg = handler.obtainMessage(Constants.MESSAGE_TOAST, "Input stream was disconnected")
+                errorMsg.sendToTarget()
             } catch (e: UnsupportedEncodingException) {
                 Log.d("Debug", "Unsupported encoding format", e)
+                val errorMsg = handler.obtainMessage(Constants.MESSAGE_TOAST, "Unsupported encoding format")
+                errorMsg.sendToTarget()
+            } catch (e: KotlinNullPointerException) {
+                val errorMsg = handler.obtainMessage(Constants.MESSAGE_TOAST, "Kotlin null pointer exception")
+                errorMsg.sendToTarget()
+                e.printStackTrace()
             }
 
 
@@ -92,31 +118,38 @@ class BluetoothService {
 //            readMsg.sendToTarget()
         }
 
-        fun write(bytes: ByteArray) {
+        fun write(byte: Int) {
             try {
 //                outputStream.write(bytes)
-                val isConnected: Boolean
-                BTSocket.outputStream?.write(1)
+//                BTSocket.outputStream?.write(1)
 
-                val readMsg = handler.obtainMessage(Constants.MESSAGE_READ, bytes)
+
+//                mSocket?.outputStream?.write(bytes)
+                mSocket?.outputStream?.write(byte)
+                val readMsg = handler.obtainMessage(Constants.MESSAGE_WRITE, byte)
                 readMsg.sendToTarget()
             } catch (e: IOException) {
                 Log.e("Debug", "Error occurred when sending data", e)
 
-//                val writeErrorMsg = handler.obtainMessage(Constants.MESSAGE_TOAST)
-//                val bundle = Bundle().apply {
-//                    putString("toast", "Couldn't send data to the other device.")
-//                }
-//                writeErrorMsg.data = bundle
-//                handler.sendMessage(writeErrorMsg)
-
-                val errorMessage = handler.obtainMessage(Constants.MESSAGE_TOAST, "데이터 전송에 실패했습니다")
+                val errorMessage = handler.obtainMessage(Constants.MESSAGE_TOAST, e.toString())
                 errorMessage.sendToTarget()
             } catch (e: UninitializedPropertyAccessException) {
                 e.printStackTrace()
                 val errorMessage = handler.obtainMessage(Constants.MESSAGE_TOAST, "블루투스를 연결해 주세요")
                 errorMessage.sendToTarget()
+            } catch (e: KotlinNullPointerException) {
+                val errorMsg = handler.obtainMessage(Constants.MESSAGE_TOAST, "Kotlin null pointer exception")
+                errorMsg.sendToTarget()
+                e.printStackTrace()
             }
+        }
+    }
+
+    fun isConnected(): Boolean {
+        return if (mSocket == null) {
+            false
+        } else {
+            mSocket!!.isConnected
         }
     }
 }

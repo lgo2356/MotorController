@@ -4,7 +4,7 @@ import android.bluetooth.BluetoothSocket
 import java.io.InputStream
 import java.io.OutputStream
 
-class BTSocket {
+class BTS {
 
     companion object {
         var socket: BluetoothSocket? = null

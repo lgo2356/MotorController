@@ -30,7 +30,7 @@ class BTDialogRecyclerAdapter(private val items: ArrayList<Device>) :
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         holder.deviceName.text = items[position].deviceName
 //        holder.deviceAddress.text = items[position].deviceAddress
-        Glide.with(holder.itemView).asGif().load(R.raw.loading02).into(holder.deviceConnectingProgress)
+//        Glide.with(holder.itemView).asGif().load(R.raw.loading02).into(holder.deviceConnectingProgress)
 
         holder.itemView.setOnClickListener {
             listener?.onItemClick(it, position)
@@ -44,7 +44,7 @@ class BTDialogRecyclerAdapter(private val items: ArrayList<Device>) :
     class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val deviceName: TextView = itemView.textview_device_name
 //        val deviceAddress: TextView = itemView.textview_device_address
-        val deviceConnectingProgress: ImageView = itemView.image_device_connecting_progress
+//        val deviceConnectingProgress: ImageView = itemView.image_device_connecting_progress
     }
 
     fun addItem(name: String, address: String) {

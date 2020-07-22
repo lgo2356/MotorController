@@ -78,7 +78,15 @@
         android:id="@+id/text_message"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Test"
+        android:text="Test1"
+        android:textSize="24sp"
+        app:layout_constraintBottom_toTopOf="@id/text_read" />
+
+    <TextView
+        android:id="@+id/text_read"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Test2"
         android:textSize="24sp"
         app:layout_constraintBottom_toBottomOf="parent" />
 
