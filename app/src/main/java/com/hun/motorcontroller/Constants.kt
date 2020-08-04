@@ -16,7 +16,6 @@ class Constants {
         const val MESSAGE_CONNECTED: Int = 4
         const val MESSAGE_DEVICE: Int = 5
         const val MESSAGE_ERROR: Int = 6
-
-        val UUID_SERIAL_PORT: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+        const val MESSAGE_DISCONNECTED: Int = 7
     }
 }

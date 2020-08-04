@@ -6,5 +6,8 @@
     <color name="colorBluetoothDisconnected">#D0312D</color>
     <color name="colorBluetoothConnected">#3DED97</color>
     <color name="colorDivider">#212121</color>
+    <color name="colorMotorPressDown">#777777</color>
+    <color name="colorMotorItemBackgroundNormal">#5A595B</color>
     <color name="colorDialogText">#FFFFFF</color>
+    <color name="colorTransparent">#00000000</color>
 </resources>

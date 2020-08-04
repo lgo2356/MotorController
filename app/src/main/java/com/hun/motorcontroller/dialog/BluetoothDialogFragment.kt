@@ -52,13 +52,8 @@ class BluetoothDialogFragment(private val handler: Handler) : DialogFragment() {
     private var connectDisposable: Disposable? = null
 
     private var fragmentActivity: FragmentActivity? = null
-//    private lateinit var deviceScanningProgress: ImageView
     private lateinit var discoveringProgressbar: ProgressBar
-
-    private var isConnecting = false
-
-//    private var thread: com.hun.motorcontroller.ConnectThread? = null
-//    private var thread: ConnectThread? = null
+    private lateinit var connectingProgressbar: ProgressBar
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
 
@@ -66,7 +61,7 @@ class BluetoothDialogFragment(private val handler: Handler) : DialogFragment() {
             this.fragmentActivity = fragmentActivity
             checkPermissions(fragmentActivity)
             activateBluetooth()
-            registerBluetoothReceive()
+            registerBluetoothReceiver()
 
             val builder = AlertDialog.Builder(fragmentActivity, R.style.DialogTheme)
             val inflater = requireActivity().layoutInflater
@@ -75,9 +70,6 @@ class BluetoothDialogFragment(private val handler: Handler) : DialogFragment() {
             val pairedDevicesRecycler = view.findViewById<RecyclerView>(R.id.recycler_paired_devices)
             val discoveredDevicesRecycler = view.findViewById<RecyclerView>(R.id.recycler_discovered_devices)
             discoveringProgressbar = view.findViewById(R.id.progressbar_discovering)
-//            val pairedDeviceCover = view.findViewById<FrameLayout>(R.id.cover_paired)
-//            deviceScanningProgress = view.findViewById(R.id.image_device_scanning_progress)
-//            Glide.with(this).asGif().load(R.raw.loading02).into(deviceScanningProgress)
 
             pairedDevicesRecycler.adapter = btDialogPairedAdapter
             pairedDevicesRecycler.layoutManager = LinearLayoutManager(context)
@@ -101,18 +93,25 @@ class BluetoothDialogFragment(private val handler: Handler) : DialogFragment() {
 
             scanBluetoothDevices()
 
-            // Paired recycler 아이템 클릭 이벤트 처리
+            // Paired
             btDialogPairedAdapter.setOnItemClickListener(
                 object : BTDialogRecyclerAdapter.OnItemClickListener {
                     override fun onItemClick(view: View, position: Int) {
+                        bluetoothAdapter?.cancelDiscovery()
+
                         val devices = btDialogPairedAdapter.getItems()
                         val deviceAddress = devices[position].deviceAddress
+                        val device: BluetoothDevice? = bluetoothAdapter?.getRemoteDevice(deviceAddress)
 
-                        bluetoothAdapter?.cancelDiscovery()
-                        bluetoothAdapter?.getRemoteDevice(deviceAddress)?.let { device ->
-                            view.image_device_connecting_progress.visibility = View.VISIBLE
+                        if (device != null) {
+                            btDialogPairedAdapter.setConnectingProgress(true)
                             val connectReqMsg = handler.obtainMessage(Constants.MESSAGE_DEVICE, device)
                             connectReqMsg.sendToTarget()
+                        } else {
+                            btDialogPairedAdapter.setConnectingProgress(false)
+                            val errorMsg = handler.obtainMessage(Constants.MESSAGE_ERROR,
+                                "블루투스 연결에 실패했습니다")
+                            errorMsg.sendToTarget()
                         }
 
                         // 프로그래스 이미지 처리 방법 고민해보기
@@ -126,27 +125,26 @@ class BluetoothDialogFragment(private val handler: Handler) : DialogFragment() {
                     }
                 })
 
-            // Discovered recycler 아이템 클릭 이벤트 처리
+            // Discovered
             btDialogDiscoveredAdapter.setOnItemClickListener(
                 object : BTDialogRecyclerAdapter.OnItemClickListener {
                     override fun onItemClick(view: View, position: Int) {
+                        bluetoothAdapter?.cancelDiscovery()
+
                         val devices = btDialogDiscoveredAdapter.getItems()
                         val deviceAddress = devices[position].deviceAddress
+                        val device = bluetoothAdapter?.getRemoteDevice(deviceAddress)
 
-                        bluetoothAdapter?.cancelDiscovery()
-                        bluetoothAdapter?.getRemoteDevice(deviceAddress)?.let { device ->
+                        if (device != null) {
+                            btDialogDiscoveredAdapter.setConnectingProgress(true)
                             val connectReqMsg = handler.obtainMessage(Constants.MESSAGE_DEVICE, device)
                             connectReqMsg.sendToTarget()
+                        } else {
+                            btDialogDiscoveredAdapter.setConnectingProgress(false)
+                            val errorMsg = handler.obtainMessage(Constants.MESSAGE_ERROR,
+                                "블루투스 연결에 실패했습니다")
+                            errorMsg.sendToTarget()
                         }
-
-//                        bluetoothAdapter?.getRemoteDevice(deviceAddress)?.let {
-//                            view.image_device_connecting_progress.visibility = View.VISIBLE
-//                            if (connectDisposable == null) {
-//                                if (BTSocket.socket == null) {
-//                                    connectToSocket(it)
-//                                }
-//                            }
-//                        }
                     }
                 })
 
@@ -222,14 +220,17 @@ class BluetoothDialogFragment(private val handler: Handler) : DialogFragment() {
 
                 BluetoothAdapter.ACTION_DISCOVERY_STARTED -> {
                     Log.d("Receiver Action", "ACTION DISCOVERY STARTED")
-//                    deviceScanningProgress.visibility = View.VISIBLE
                     setProgress(true)
                 }
 
                 BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
                     Log.d("Receiver Action", "ACTION DISCOVERY FINISHED")
-//                    deviceScanningProgress.visibility = View.INVISIBLE
                     setProgress(false)
+                }
+
+                BluetoothDevice.ACTION_ACL_CONNECTED-> {
+                    Log.d("Debug", "Bluetooth device connected")
+                    btDialogPairedAdapter.setConnectingProgress(false)
                 }
 
                 null -> {
@@ -280,13 +281,15 @@ class BluetoothDialogFragment(private val handler: Handler) : DialogFragment() {
         }
     }
 
-    private fun registerBluetoothReceive() {
+    private fun registerBluetoothReceiver() {
         val filter = IntentFilter().apply {
             addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
             addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED)
             addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
             addAction(BluetoothDevice.ACTION_FOUND)
+            addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
         }
+
         fragmentActivity?.registerReceiver(receiver, filter)
     }
 
@@ -294,7 +297,10 @@ class BluetoothDialogFragment(private val handler: Handler) : DialogFragment() {
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
 
         if (bluetoothAdapter == null) {
-            Toast.makeText(fragmentActivity, "블루투스 기능을 지원하지 않는 디바이스입니다.", Toast.LENGTH_SHORT).show()
+            val toastMsg = handler.obtainMessage(Constants.MESSAGE_TOAST,
+                "블루투스 기능을 지원하지 않는 디바이스입니다.")
+            toastMsg.sendToTarget()
+            dismiss()
         } else {
             val enableBluetoothIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
             fragmentActivity?.startActivityForResult(
@@ -309,85 +315,21 @@ class BluetoothDialogFragment(private val handler: Handler) : DialogFragment() {
         bluetoothAdapter?.startDiscovery()
     }
 
-    fun setConnectionIconToConnected() {
-        val icon: ImageView? = activity?.findViewById(R.id.image_lamp)
-        icon?.setImageResource(R.drawable.bluetooth_state_connected_shape)
-    }
-
-    fun setConnectionIconToDisconnected() {
-        val icon: ImageView? = activity?.findViewById(R.id.image_lamp)
-        icon?.setImageResource(R.drawable.bluetooth_state_disconnected_shape)
-    }
-
-    private fun connectToSocket(device: BluetoothDevice) {
-        val socket = device.createInsecureRfcommSocketToServiceRecord(Constants.UUID_SERIAL_PORT)
-
-        connectDisposable = Observable.just(socket)
-            .subscribeOn(Schedulers.io())
-            .doOnNext {
-                try {
-                    bluetoothAdapter?.cancelDiscovery()
-                    it.connect()
-                    BTS.socket = it
-                    BTS.inputStream = it.inputStream
-                    BTS.outputStream = it.outputStream
-
-                    handler.sendEmptyMessage(Constants.MESSAGE_CONNECTED)
-                    setConnectionIconToConnected()
-                } catch (e: IOException) {
-                    Log.d("Debug", "Couldn't connect to your device", e)
-                    val errorMsg = handler.obtainMessage(Constants.MESSAGE_TOAST, "블루투스 연결에 실패했습니다")
-                    errorMsg.sendToTarget()
-
-                    if (BTS.socket?.isConnected!!) {
-                        BTS.socket?.close()
-                    } else {
-                        setConnectionIconToDisconnected()
-                    }
-                } catch (e: UninitializedPropertyAccessException) {
-                    e.printStackTrace()
-                } catch (e: KotlinNullPointerException) {
-                    e.printStackTrace()
-                }
-            }
-            .doOnComplete {
-                this.dismiss()
-            }
-            .doOnError {
-                throw it
-            }
-            .subscribe()
-    }
-
     // Return paired devices as Set
     private fun getPairedDevices(): Set<BluetoothDevice>? {
         return bluetoothAdapter?.bondedDevices
     }
 
-    private fun setPairedEmpty(cover: FrameLayout) {
-        cover.visibility = View.VISIBLE
-//        cover.layoutParams = ConstraintLayout.LayoutParams(
-//            ConstraintLayout.LayoutParams.MATCH_PARENT,
-//            ConstraintLayout.LayoutParams.WRAP_CONTENT
-//        )
-    }
-
     override fun onStop() {
         super.onStop()
-
-        connectDisposable?.dispose()
         bluetoothAdapter?.cancelDiscovery()
 
         try {
             fragmentActivity?.unregisterReceiver(receiver)
         } catch (e: IllegalArgumentException) {
-            e.printStackTrace()
+            Log.d("Debug", "Failed to unregister receiver", e)
+            val errorMsg = handler.obtainMessage(Constants.MESSAGE_ERROR, "Failed to unregister receiver")
+            errorMsg.sendToTarget()
         }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-
-        Log.d("Debug", "onDestroy")
     }
 }

@@ -2,7 +2,10 @@ package com.hun.motorcontroller
 
 import android.app.Activity
 import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Handler
@@ -10,38 +13,34 @@ import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
+import android.view.View
 import android.widget.Toast
+import android.widget.ToggleButton
+import com.google.android.material.snackbar.Snackbar
 import com.hun.motorcontroller.data.Motor
 import com.hun.motorcontroller.dialog.BluetoothDialogFragment
 import com.hun.motorcontroller.dialog.MotorSettingDialogFragment
 import com.hun.motorcontroller.recycler_adapter.MotorRecyclerAdapter
-import io.reactivex.disposables.Disposable
 import io.realm.Realm
 import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.coroutines.*
+import java.io.IOException
 
-import java.lang.Exception
-import java.nio.charset.StandardCharsets.US_ASCII
+import java.lang.IllegalArgumentException
 
 class MainActivity : AppCompatActivity() {
 
-    /**
-     *  Auto mode on/off
-     *  on -> write button 한 번만 클릭하면 계속 실행 패킷 전송(1),
-     *  또 한 번 더 클릭하면 계속 종료 패킷 전송(2)
-     *
-     *  off -> write button 터치하고 있을 때만 계속 실행 패킷 전송(1),
-     *  터치 안 할 때는 계속 종료 패킷 전송(2)
-     */
-
     private var isWriteButtonPressed = false
+    private var isWriteToggled = false
+
+    private val coroutineList: ArrayList<Job> = ArrayList()
 
     private val motorAdapter: MotorRecyclerAdapter = MotorRecyclerAdapter()
     private val motorRealm: Realm = Realm.getDefaultInstance()
-    private var readDisposable: Disposable? = null
 
-    //    private val bluetoothService = BluetoothService()
     private lateinit var bluetoothService: BluetoothService
     private lateinit var bluetoothDialog: BluetoothDialogFragment
+
     private lateinit var handler: Handler
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,13 +50,13 @@ class MainActivity : AppCompatActivity() {
         supportActionBar?.setDisplayShowTitleEnabled(false)
 
         recycler_motor_buttons.adapter = motorAdapter
-//        recycler_motor_buttons.layoutManager = GridLayoutManager(this, 2)
 
         handler = Handler {
             when (it.what) {
                 Constants.MESSAGE_READ -> {
-                    val readBytes: ByteArray = it.obj as ByteArray
-                    val readString = String(readBytes, US_ASCII)
+//                    val readBytes: ByteArray = it.obj as ByteArray
+//                    val readString = String(readBytes, US_ASCII)
+                    val readString: String = it.obj as String
                     text_read.text = readString
                 }
 
@@ -76,11 +75,23 @@ class MainActivity : AppCompatActivity() {
 
                 Constants.MESSAGE_CONNECTED -> {
                     if (::bluetoothService.isInitialized) {
-                        Toast.makeText(applicationContext, "데이터 수신 시작", Toast.LENGTH_SHORT).show()
-                        bluetoothService.IOThread().start()
+                        Toast.makeText(applicationContext, "디바이스에 연결되었습니", Toast.LENGTH_SHORT).show()
+//                        bluetoothService.IOThread().start()
+                        bluetoothService.startRead()
 
-                        bluetoothDialog.setConnectionIconToConnected()
+                        setDeviceConnectingIcon(true)
                         bluetoothDialog.dismiss()
+                    } else {
+                        Toast.makeText(applicationContext, "Late init exception", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                Constants.MESSAGE_DISCONNECTED -> {
+                    if (::bluetoothService.isInitialized) {
+                        Toast.makeText(applicationContext, "디바이스와의 연결이 끊어졌습니다", Toast.LENGTH_SHORT).show()
+                        bluetoothService.close()
+
+                        setDeviceConnectingIcon(false)
                     } else {
                         Toast.makeText(applicationContext, "Late init exception", Toast.LENGTH_SHORT).show()
                     }
@@ -88,20 +99,21 @@ class MainActivity : AppCompatActivity() {
 
                 Constants.MESSAGE_DEVICE -> {
                     val device: BluetoothDevice = it.obj as BluetoothDevice
-
-                    bluetoothService = BluetoothService(handler, device)
-                    bluetoothService.ConnectThread().start()
+                    bluetoothService.connect(device)
                 }
 
                 Constants.MESSAGE_ERROR -> {
-                    bluetoothDialog.setConnectionIconToDisconnected()
+                    val message = it.obj.toString()
+                    Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT).show()
+
+//                    setDeviceConnectingIcon(false)
                     bluetoothDialog.dismiss()
                 }
             }
             true
         }
 
-//        bluetoothService = BluetoothService(handler)
+        bluetoothService = BluetoothService(handler)
 
         motorAdapter.motors = motorRealm.where(Motor::class.java).findAll()
         motorRealm.addChangeListener { motorAdapter.notifyDataSetChanged() }
@@ -111,61 +123,78 @@ class MainActivity : AppCompatActivity() {
             motorSettingDialog.show(supportFragmentManager, "missiles")
         }
 
-        switch_auto.setOnCheckedChangeListener { compoundButton, isChecked ->
-            if (isChecked) {
+        motorAdapter.setOnButtonTouchListener(object : MotorRecyclerAdapter.OnButtonTouchListener {
+            override fun onButtonTouchActionDown(view: View, motionEvent: MotionEvent, position: Int) {
+                isWriteButtonPressed = true
 
-            } else {
+                if (coroutineList.size > 0) {
+                    for (job in coroutineList) {
+                        job.cancel()
+                    }
+                    coroutineList.clear()
+                }
 
-            }
-        }
-
-        button_write.setOnTouchListener { view, motionEvent ->
-            when (motionEvent.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    if (::bluetoothService.isInitialized) {
-                        if (bluetoothService.isConnected()) {
-                            isWriteButtonPressed = true
-                            TouchHandleThread().start()
-                        } else {
-                            Toast.makeText(applicationContext, "블루투스를 연결해주세요", Toast.LENGTH_SHORT).show()
-                        }
+                if (::bluetoothService.isInitialized) {
+                    if (bluetoothService.isConnected()) {
+                        sendPacketManually()
                     } else {
-                        Toast.makeText(applicationContext, "Late init exception", Toast.LENGTH_SHORT).show()
+                        showSnackBar("블루투스를 연결해주세요")
                     }
-                }
-
-                MotionEvent.ACTION_UP -> {
-                    view.performClick()
-                    isWriteButtonPressed = false
-
-                    if (::bluetoothService.isInitialized) {
-                        if (bluetoothService.isConnected()) {
-                            bluetoothService.IOThread().write(2)
-                        }
-                    }
+                } else {
+                    Toast.makeText(applicationContext, "Late init exception", Toast.LENGTH_SHORT).show()
                 }
             }
 
-            true
-        }
+            override fun onButtonTouchActionUp(view: View, motionEvent: MotionEvent, position: Int) {
+                isWriteButtonPressed = false
+            }
 
-//        motorAdapter.setOnItemClickListener(object : MotorRecyclerAdapter.OnItemClickListener {
-//            override fun onItemClick(view: View, position: Int) {
-//                val message = "Test message"
-//                bluetoothService.IOThread(handler).write(message.toByteArray())
+            override fun onButtonTouchActionCancel(view: View, motionEvent: MotionEvent, position: Int) {
+                isWriteButtonPressed = false
+            }
+        })
+
+        motorAdapter.setOnToggleClickListener(object : MotorRecyclerAdapter.OnToggleClickListener {
+            override fun onToggleClick(view: View, position: Int, isChecked: Boolean) {
+                isWriteToggled = (view as ToggleButton).isChecked
+
+                if (coroutineList.size > 0) {
+                    for (job in coroutineList) {
+                        job.cancel()
+                    }
+                    coroutineList.clear()
+                }
+
+                if (::bluetoothService.isInitialized) {
+                    if (bluetoothService.isConnected()) {
+                        sendPacketAutomatically()
+                    } else {
+                        showSnackBar("블루투스를 연결해주세요")
+                    }
+                } else {
+                    Toast.makeText(applicationContext, "Late init exception", Toast.LENGTH_SHORT).show()
+                }
+            }
+        })
+    }
+
+    private fun setDeviceConnectingIcon(isConnecting: Boolean) {
+        if (isConnecting) {
+            image_lamp.setImageResource(R.drawable.bluetooth_state_connected_shape)
+        } else {
+            image_lamp.setImageResource(R.drawable.bluetooth_state_disconnected_shape)
+        }
+    }
+
+//    private fun clearMotorList() {
+//        Realm.getDefaultInstance().use {
+//            val results = it.where(Motor::class.java).findAll()
+//
+//            it.executeTransaction {
+//                results.deleteAllFromRealm()
 //            }
-//        })
-    }
-
-    private fun clearMotorList() {
-        Realm.getDefaultInstance().use {
-            val results = it.where(Motor::class.java).findAll()
-
-            it.executeTransaction {
-                results.deleteAllFromRealm()
-            }
-        }
-    }
+//        }
+//    }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.toolbar_main, menu)
@@ -185,7 +214,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             R.id.action_motor_preference -> {
-                clearMotorList()
+//                clearMotorList()
                 val motorSettingDialog = MotorSettingDialogFragment()
                 motorSettingDialog.show(supportFragmentManager, "missiles")
                 true
@@ -211,37 +240,124 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
+    private fun sendPacketManually() {
+        val writeManuallyScope = CoroutineScope(Dispatchers.IO).launch {
+            try {
+                var count = 0
+                while (bluetoothService.isConnected()) {
+                    if (isWriteButtonPressed) {
+                        Log.d("Debug", "Manual mode 1 - ${count++}")
+                        bluetoothService.writeByte(1)
+                    } else {
+                        Log.d("Debug", "Manual mode 2 - ${count++}")
+                        bluetoothService.writeByte(2)
+                    }
+                    delay(5)
+                }
+            } catch (e: IOException) {
+                Log.d("Debug", "Error from writeManuallyScope", e)
+                this.cancel()
+            }
+        }
+        coroutineList.add(writeManuallyScope)
+    }
 
-        motorRealm.close()
+    private fun sendPacketAutomatically() {
+        val writeAutomaticallyScope = CoroutineScope(Dispatchers.IO).launch {
+            try {
+                var count = 0
+                while (bluetoothService.isConnected()) {
+                    if (isWriteToggled) {
+                        Log.d("Debug", "Auto mode 1 - ${count++}")
+                        bluetoothService.writeByte(1)
+                    } else {
+                        Log.d("Debug", "Auto mode 2 - ${count++}")
+                        bluetoothService.writeByte(2)
+                    }
+                    delay(5)
+                }
+            } catch (e: IOException) {
+                Log.d("Debug", "Error from writeAutomaticallyScope", e)
+                this.cancel()
+            }
+        }
+        coroutineList.add(writeAutomaticallyScope)
+    }
 
-        if (::bluetoothService.isInitialized) {
-            bluetoothService.ConnectThread().cancel()
-        } else {
-            Toast.makeText(applicationContext, "Late init exception", Toast.LENGTH_SHORT).show()
+    private fun showSnackBar(message: String) {
+        val snackBar = Snackbar.make(container_main, message, Snackbar.LENGTH_INDEFINITE)
+        snackBar.setAction("확인") { snackBar.dismiss() }.show()
+    }
+
+    private fun registerBluetoothReceiver() {
+        val filter = IntentFilter().apply {
+            addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+        }
+        this.registerReceiver(receiver, filter)
+    }
+
+    private val receiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
+                    Log.d("Debug", "Bluetooth device disconnected")
+                    setDeviceConnectingIcon(false)
+                    bluetoothService.close()
+                }
+            }
         }
     }
 
-    private inner class TouchHandleThread : Thread() {
-        override fun run() {
-            super.run()
+    override fun onStart() {
+        super.onStart()
+        Log.d("Debug", "onStart")
+    }
 
-            var count = 0
+    override fun onResume() {
+        super.onResume()
+        Log.d("Debug", "onResume")
+        registerBluetoothReceiver()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        Log.d("Debug", "onPause")
+    }
+
+    override fun onRestart() {
+        super.onRestart()
+        Log.d("Debug", "onRestart")
+    }
+
+    override fun onStop() {
+        super.onStop()
+        Log.d("Debug", "onStop")
+
+        try {
+            this.unregisterReceiver(receiver)
+        } catch (e: IllegalArgumentException) {
+            Log.d("Debug", "Failed to unregister receiver", e)
+//            val errorMsg = handler.obtainMessage(Constants.MESSAGE_ERROR, "Failed to unregister receiver")
+//            errorMsg.sendToTarget()
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.d("Debug", "onDestroy")
+
+        if (!motorRealm.isClosed) {
             try {
-                while (isWriteButtonPressed) {
-                    Log.d("Debug", "${count++}")
-                    val msg = "${count++}"
-
-                    if (::bluetoothService.isInitialized) {
-                        bluetoothService.IOThread().write(1)
-                    }
-
-                    sleep(5)
-                }
-            } catch (e: Exception) {
-                Log.d("Debug", "Touch handler thread error", e)
+                motorRealm.close()
+            } catch (e: IllegalArgumentException) {
+                Log.d("Debug", "Failed to close the Realm object", e)
             }
+        }
+
+        if (::bluetoothService.isInitialized) {
+            bluetoothService.close()
+        } else {
+            Log.d("Debug", "BluetoothService is not initialized")
         }
     }
 }

@@ -1,9 +1,11 @@
 package com.hun.motorcontroller.recycler_adapter
 
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -15,7 +17,9 @@ import kotlinx.android.synthetic.main.layout_bluetooth_device_item.view.*
 class BTDialogRecyclerAdapter(private val items: ArrayList<Device>) :
     RecyclerView.Adapter<BTDialogRecyclerAdapter.ViewHolder>() {
 
-    private var listener: OnItemClickListener? = null
+    private var clickListener: OnItemClickListener? = null
+
+    private var isConnecting: Boolean = false
 
     interface OnItemClickListener {
         fun onItemClick(view: View, position: Int)
@@ -29,11 +33,15 @@ class BTDialogRecyclerAdapter(private val items: ArrayList<Device>) :
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         holder.deviceName.text = items[position].deviceName
-//        holder.deviceAddress.text = items[position].deviceAddress
-//        Glide.with(holder.itemView).asGif().load(R.raw.loading02).into(holder.deviceConnectingProgress)
 
         holder.itemView.setOnClickListener {
-            listener?.onItemClick(it, position)
+            clickListener?.onItemClick(it, position)
+        }
+
+        if (isConnecting) {
+            holder.connectingProgressBar.visibility = View.VISIBLE
+        } else {
+            holder.connectingProgressBar.visibility = View.GONE
         }
     }
 
@@ -43,6 +51,7 @@ class BTDialogRecyclerAdapter(private val items: ArrayList<Device>) :
 
     class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val deviceName: TextView = itemView.textview_device_name
+        val connectingProgressBar: ProgressBar = itemView.progressbar_connecting
 //        val deviceAddress: TextView = itemView.textview_device_address
 //        val deviceConnectingProgress: ImageView = itemView.image_device_connecting_progress
     }
@@ -58,6 +67,11 @@ class BTDialogRecyclerAdapter(private val items: ArrayList<Device>) :
     }
 
     fun setOnItemClickListener(listener: OnItemClickListener) {
-        this.listener = listener
+        this.clickListener = listener
+    }
+
+    fun setConnectingProgress(isConnecting: Boolean) {
+        this.isConnecting = isConnecting
+        notifyDataSetChanged()
     }
 }

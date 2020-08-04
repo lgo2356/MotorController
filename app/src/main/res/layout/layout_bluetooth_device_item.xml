@@ -39,21 +39,10 @@
                 app:layout_constraintLeft_toLeftOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />
 
-            <!--            <TextView-->
-            <!--                android:id="@+id/textview_device_address"-->
-            <!--                android:layout_width="match_parent"-->
-            <!--                android:layout_height="wrap_content"-->
-            <!--                android:ellipsize="end"-->
-            <!--                android:text="DEVICE ADDRESS"-->
-            <!--                android:textSize="12sp"-->
-            <!--                app:layout_constraintLeft_toLeftOf="parent"-->
-            <!--                app:layout_constraintRight_toRightOf="parent"-->
-            <!--                app:layout_constraintTop_toBottomOf="@id/textview_device_name" />-->
-
-            <ImageView
-                android:id="@+id/image_device_connecting_progress"
-                android:layout_width="18dp"
-                android:layout_height="18dp"
+            <ProgressBar
+                android:id="@+id/progressbar_connecting"
+                android:layout_width="15dp"
+                android:layout_height="15dp"
                 android:visibility="gone"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintRight_toRightOf="parent"

@@ -5,72 +5,87 @@ import android.bluetooth.BluetoothSocket
 import android.os.Handler
 import android.util.Log
 import android.widget.Toast
+import kotlinx.coroutines.*
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import java.io.UnsupportedEncodingException
 import java.lang.Exception
 import java.nio.charset.StandardCharsets.US_ASCII
+import java.util.*
 
-class BluetoothService(private val handler: Handler, private val device: BluetoothDevice) {
+class BluetoothService(private val handler: Handler) {
+
+    private val insecureUuid: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
     private var mSocket: BluetoothSocket? = null
-//    private val mDevice: BluetoothDevice = device
+    private var mOutputStream: OutputStream? = null
+    private var mInputStream: InputStream? = null
 
-    inner class ConnectThread : Thread() {
+    private val readJob = Job()
+    private val writeByteJob = Job()
+    private val readScope = CoroutineScope(Dispatchers.Main + readJob)
+    private val writeByteScope = CoroutineScope(Dispatchers.Main + writeByteJob)
 
-        override fun run() {
+    fun connect(device: BluetoothDevice) {
+        GlobalScope.launch(Dispatchers.IO) {
             try {
-//                val createMethod = device.javaClass
-//                    .getMethod(
-//                        "createInsecureRfcommSocket",
-//                        *arrayOf<Class<*>?>(Int::class.javaPrimitiveType)
-//                    )
-//                val socket = createMethod.invoke(device, 1) as BluetoothSocket
-//                BTSocket.socket = socket
-//                BTSocket.inputStream = socket.inputStream
-//                BTSocket.outputStream = socket.outputStream
+                mSocket = device.createInsecureRfcommSocketToServiceRecord(insecureUuid)
 
+                if (mSocket != null) {
+                    mSocket?.connect()
+                    mOutputStream = mSocket?.outputStream
+                    mInputStream = mSocket?.inputStream
 
-                mSocket = device.createInsecureRfcommSocketToServiceRecord(Constants.UUID_SERIAL_PORT)
-                mSocket?.connect()
-                handler.sendEmptyMessage(Constants.MESSAGE_CONNECTED)
-            } catch (e: Exception) {
-                Log.e("Debug", "Couldn't connect to your device")
-                e.printStackTrace()
-
-                val errorMsg = handler.obtainMessage(Constants.MESSAGE_TOAST, "블루투스 연결에 실패했습니다")
-                errorMsg.sendToTarget()
-                handler.sendEmptyMessage(Constants.MESSAGE_ERROR)
-            }
-        }
-
-        fun cancel() {
-            try {
-                mSocket?.close()
+                    handler.sendEmptyMessage(Constants.MESSAGE_CONNECTED)
+                } else {
+                    sendErrorMessage("블루투스 연결에 실패했습니다")
+                }
             } catch (e: IOException) {
-                Log.d("Debug", "Couldn't close the client socket", e)
+                Log.d("Debug", "Couldn't connect to your device", e)
+                sendErrorMessage("블루투스 연결에 실패했습니다")
             }
         }
     }
 
-    inner class IOThread : Thread() {
+    fun writeByteArray(bytes: ByteArray) {
 
-        private val buffer: ByteArray = ByteArray(1024)
-        private var bufferPosition = 0
-        private val delimiter: Byte = 0x0A
+    }
 
-        override fun run() {
-//            val b: Byte = 0x0A
-//            val msg = handler.obtainMessage(Constants.MESSAGE_READ, b)
-//            msg.sendToTarget()
+    fun writeByte(byte: Int) {
+        writeByteScope.launch(Dispatchers.IO) {
+            try {
+                mOutputStream?.write(byte) ?: sendErrorMessage("패킷 전송에 실패했습니다")
+
+                val writeMsg = handler.obtainMessage(Constants.MESSAGE_WRITE, byte)
+                writeMsg.sendToTarget()
+                Log.d("Debug", "데이타 전송에 성공했습니다")
+            } catch (e: IOException) {
+                Log.d("Debug", "데이타 전송에 실패했습니다")
+                val errorMessage = handler.obtainMessage(Constants.MESSAGE_TOAST, "패킷 전송에 실패했습니다")
+                errorMessage.sendToTarget()
+
+                throw IOException()
+            }
+        }
+    }
+
+    fun startRead() {
+        readScope.launch(Dispatchers.IO) {
+            val buffer = ByteArray(1024)
+            var bufferPosition = 0
+            val delimiter: Byte = 0x0A
 
             try {
-                while (true) {
-//                    val bytesAvailable = BTS.inputStream?.available()!!
-                    val bytesAvailable = mSocket?.inputStream?.available()!!
+                while (mSocket != null) {
+                    var bytesAvailable = 0
+
+                    if (mSocket != null && mSocket?.isConnected == true) {
+                        bytesAvailable = mInputStream?.available() ?: 0
+                    }
 
                     if (bytesAvailable > 0) {
                         val packetBytes = ByteArray(bytesAvailable)
-//                        BTS.inputStream?.read(packetBytes)
                         mSocket?.inputStream?.read(packetBytes)
 
                         for (i in 0 until bytesAvailable) {
@@ -93,8 +108,7 @@ class BluetoothService(private val handler: Handler, private val device: Bluetoo
                 }
             } catch (e: IOException) {
                 Log.d("Debug", "Input stream was disconnected", e)
-                val errorMsg = handler.obtainMessage(Constants.MESSAGE_TOAST, "Input stream was disconnected")
-                errorMsg.sendToTarget()
+                close()
             } catch (e: UnsupportedEncodingException) {
                 Log.d("Debug", "Unsupported encoding format", e)
                 val errorMsg = handler.obtainMessage(Constants.MESSAGE_TOAST, "Unsupported encoding format")
@@ -104,52 +118,40 @@ class BluetoothService(private val handler: Handler, private val device: Bluetoo
                 errorMsg.sendToTarget()
                 e.printStackTrace()
             }
-
-
-//            var numBytes: Int
-//            numBytes = try {
-//                BTSocket.inputStream.read(buffer)
-//            } catch (e: IOException) {
-//                Log.d("Debug", "Input stream was disconnected", e)
-//                break
-//            }
-//
-//            val readMsg: Message = handler.obtainMessage(Constants.MESSAGE_READ, numBytes, -1, buffer)
-//            readMsg.sendToTarget()
         }
+    }
 
-        fun write(byte: Int) {
-            try {
-//                outputStream.write(bytes)
-//                BTSocket.outputStream?.write(1)
+    fun close() {
+        try {
+            writeByteJob.cancel()
+            mOutputStream?.close()
+            mOutputStream = null
+            Log.d("Debug", "Output stream closed")
 
+            readJob.cancel()
+            mInputStream?.close()
+            mInputStream = null
+            Log.d("Debug", "Input stream closed")
 
-//                mSocket?.outputStream?.write(bytes)
-                mSocket?.outputStream?.write(byte)
-                val readMsg = handler.obtainMessage(Constants.MESSAGE_WRITE, byte)
-                readMsg.sendToTarget()
-            } catch (e: IOException) {
-                Log.e("Debug", "Error occurred when sending data", e)
-
-                val errorMessage = handler.obtainMessage(Constants.MESSAGE_TOAST, e.toString())
-                errorMessage.sendToTarget()
-            } catch (e: UninitializedPropertyAccessException) {
-                e.printStackTrace()
-                val errorMessage = handler.obtainMessage(Constants.MESSAGE_TOAST, "블루투스를 연결해 주세요")
-                errorMessage.sendToTarget()
-            } catch (e: KotlinNullPointerException) {
-                val errorMsg = handler.obtainMessage(Constants.MESSAGE_TOAST, "Kotlin null pointer exception")
-                errorMsg.sendToTarget()
-                e.printStackTrace()
-            }
+            mSocket?.close()
+            mSocket = null
+            Log.d("Debug", "Socket closed")
+        } catch (e: IOException) {
+            Log.d("Debug", "Couldn't close the client socket", e)
+            throw IOException("Couldn't close the client socket")
         }
+    }
+
+    private fun sendErrorMessage(msg: String) {
+        val errorMsg = handler.obtainMessage(Constants.MESSAGE_ERROR, msg)
+        errorMsg.sendToTarget()
     }
 
     fun isConnected(): Boolean {
         return if (mSocket == null) {
             false
         } else {
-            mSocket!!.isConnected
+            mSocket?.isConnected ?: false
         }
     }
 }
