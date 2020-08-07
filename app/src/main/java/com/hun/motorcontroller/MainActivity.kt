@@ -1,6 +1,7 @@
 package com.hun.motorcontroller
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -14,11 +15,14 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
+import android.widget.EditText
 import android.widget.Toast
 import android.widget.ToggleButton
 import com.google.android.material.snackbar.Snackbar
 import com.hun.motorcontroller.data.Motor
 import com.hun.motorcontroller.dialog.BluetoothDialogFragment
+import com.hun.motorcontroller.dialog.MotorNameDialogFragment
+import com.hun.motorcontroller.dialog.MotorRenameDialogFragment
 import com.hun.motorcontroller.dialog.MotorSettingDialogFragment
 import com.hun.motorcontroller.recycler_adapter.MotorRecyclerAdapter
 import io.realm.Realm
@@ -136,7 +140,7 @@ class MainActivity : AppCompatActivity() {
 
                 if (::bluetoothService.isInitialized) {
                     if (bluetoothService.isConnected()) {
-                        sendPacketManually()
+                        sendPacketManually(position)
                     } else {
                         showSnackBar("블루투스를 연결해주세요")
                     }
@@ -167,12 +171,23 @@ class MainActivity : AppCompatActivity() {
 
                 if (::bluetoothService.isInitialized) {
                     if (bluetoothService.isConnected()) {
-                        sendPacketAutomatically()
+                        sendPacketAutomatically(position)
                     } else {
                         showSnackBar("블루투스를 연결해주세요")
                     }
                 } else {
                     Toast.makeText(applicationContext, "Late init exception", Toast.LENGTH_SHORT).show()
+                }
+            }
+        })
+
+        motorAdapter.setOnIconClickListener(object : MotorRecyclerAdapter.OnIconClickListener {
+            override fun onIconClick(view: View, position: Int) {
+                MotorRenameDialogFragment().apply {
+                    val args = Bundle()
+                    args.putInt("position", position)
+                    this.arguments = args
+                    this.show(this@MainActivity.supportFragmentManager, "missiles")
                 }
             }
         })
@@ -240,17 +255,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun sendPacketManually() {
+    private fun sendPacketManually(position: Int) {
         val writeManuallyScope = CoroutineScope(Dispatchers.IO).launch {
             try {
                 var count = 0
+
                 while (bluetoothService.isConnected()) {
                     if (isWriteButtonPressed) {
                         Log.d("Debug", "Manual mode 1 - ${count++}")
-                        bluetoothService.writeByte(1)
+                        val bytes: ByteArray = byteArrayOf(0x68, position.toByte(), 0x01, 0x7E)
+                        bluetoothService.writeBytes(bytes)
                     } else {
                         Log.d("Debug", "Manual mode 2 - ${count++}")
-                        bluetoothService.writeByte(2)
+                        val bytes: ByteArray = byteArrayOf(0x68, position.toByte(), 0x00, 0x7E)
+                        bluetoothService.writeBytes(bytes)
                     }
                     delay(5)
                 }
@@ -262,17 +280,20 @@ class MainActivity : AppCompatActivity() {
         coroutineList.add(writeManuallyScope)
     }
 
-    private fun sendPacketAutomatically() {
+    private fun sendPacketAutomatically(position: Int) {
         val writeAutomaticallyScope = CoroutineScope(Dispatchers.IO).launch {
             try {
                 var count = 0
+
                 while (bluetoothService.isConnected()) {
                     if (isWriteToggled) {
                         Log.d("Debug", "Auto mode 1 - ${count++}")
-                        bluetoothService.writeByte(1)
+                        val bytes: ByteArray = byteArrayOf(0x68, position.toByte(), 0x01, 0x7E)
+                        bluetoothService.writeBytes(bytes)
                     } else {
                         Log.d("Debug", "Auto mode 2 - ${count++}")
-                        bluetoothService.writeByte(2)
+                        val bytes: ByteArray = byteArrayOf(0x68, position.toByte(), 0x00, 0x7E)
+                        bluetoothService.writeBytes(bytes)
                     }
                     delay(5)
                 }

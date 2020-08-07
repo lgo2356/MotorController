@@ -40,10 +40,20 @@
         app:layout_constraintTop_toBottomOf="@id/text_motor_name" />
 
     <ImageView
+        android:id="@+id/image_rename"
+        android:layout_width="35dp"
+        android:layout_height="35dp"
+        android:layout_marginRight="15dp"
+        android:src="@drawable/edit_pen"
+        app:layout_constraintBottom_toBottomOf="@id/image_bin"
+        app:layout_constraintRight_toLeftOf="@id/image_bin"
+        app:layout_constraintTop_toTopOf="@id/image_bin" />
+
+    <ImageView
         android:id="@+id/image_bin"
         android:layout_width="35dp"
         android:layout_height="35dp"
-        android:src="@drawable/bin01"
+        android:src="@drawable/delete_bin"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toTopOf="parent"

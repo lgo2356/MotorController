@@ -24,8 +24,10 @@ class BluetoothService(private val handler: Handler) {
 
     private val readJob = Job()
     private val writeByteJob = Job()
+    private val writeBytesJob = Job()
     private val readScope = CoroutineScope(Dispatchers.Main + readJob)
     private val writeByteScope = CoroutineScope(Dispatchers.Main + writeByteJob)
+    private val writeBytesScope = CoroutineScope(Dispatchers.IO + writeBytesJob)
 
     fun connect(device: BluetoothDevice) {
         GlobalScope.launch(Dispatchers.IO) {
@@ -48,8 +50,16 @@ class BluetoothService(private val handler: Handler) {
         }
     }
 
-    fun writeByteArray(bytes: ByteArray) {
-
+    fun writeBytes(bytes: ByteArray) {
+        writeBytesScope.launch(Dispatchers.IO) {
+            try {
+                mOutputStream?.write(bytes) ?: sendErrorMessage("패킷 전송에 실패했습니다")
+            } catch (e: IOException) {
+                Log.d("Debug", "패킷 전송에 실패했습니다")
+                writeBytesJob.cancel()
+                throw IOException()
+            }
+        }
     }
 
     fun writeByte(byte: Int) {
@@ -62,6 +72,7 @@ class BluetoothService(private val handler: Handler) {
                 Log.d("Debug", "데이타 전송에 성공했습니다")
             } catch (e: IOException) {
                 Log.d("Debug", "데이타 전송에 실패했습니다")
+                writeByteJob.cancel()
                 val errorMessage = handler.obtainMessage(Constants.MESSAGE_TOAST, "패킷 전송에 실패했습니다")
                 errorMessage.sendToTarget()
 
@@ -108,6 +119,7 @@ class BluetoothService(private val handler: Handler) {
                 }
             } catch (e: IOException) {
                 Log.d("Debug", "Input stream was disconnected", e)
+                readJob.cancel()
                 close()
             } catch (e: UnsupportedEncodingException) {
                 Log.d("Debug", "Unsupported encoding format", e)

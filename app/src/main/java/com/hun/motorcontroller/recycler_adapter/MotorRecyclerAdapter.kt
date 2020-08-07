@@ -1,6 +1,7 @@
 package com.hun.motorcontroller.recycler_adapter
 
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -27,6 +28,7 @@ class MotorRecyclerAdapter : RecyclerView.Adapter<MotorRecyclerAdapter.ViewHolde
     private var touchListener: OnItemTouchListener? = null
     private var buttonTouchListener: OnButtonTouchListener? = null
     private var toggleClickListener: OnToggleClickListener? = null
+    private var iconClickListener: OnIconClickListener? = null
 
     interface OnItemTouchListener {
         fun onItemTouchActionDown(view: View, motionEvent: MotionEvent, position: Int)
@@ -45,6 +47,10 @@ class MotorRecyclerAdapter : RecyclerView.Adapter<MotorRecyclerAdapter.ViewHolde
         }
     }
 
+    interface OnIconClickListener {
+        fun onIconClick(view: View, position: Int)
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val inflater = LayoutInflater.from(parent.context)
         val view = inflater.inflate(R.layout.layout_motor_list_item, parent, false)
@@ -57,6 +63,10 @@ class MotorRecyclerAdapter : RecyclerView.Adapter<MotorRecyclerAdapter.ViewHolde
 
         holder.imageBin.setOnClickListener {
             deleteMotor(position)
+        }
+
+        holder.imageRename.setOnClickListener {
+            iconClickListener?.onIconClick(it, position)
         }
 
         holder.buttonSendData.setOnTouchListener { view, motionEvent ->
@@ -121,10 +131,15 @@ class MotorRecyclerAdapter : RecyclerView.Adapter<MotorRecyclerAdapter.ViewHolde
         this.toggleClickListener = listener
     }
 
+    fun setOnIconClickListener(listener: OnIconClickListener) {
+        this.iconClickListener = listener
+    }
+
     class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val textMotorName: TextView = itemView.findViewById(R.id.text_motor_name)
         val buttonSendData: Button = itemView.findViewById(R.id.button_send_data)
         val toggleSendData: ToggleButton = itemView.findViewById(R.id.toggle_send_data)
         val imageBin: ImageView = itemView.findViewById(R.id.image_bin)
+        val imageRename: ImageView = itemView.findViewById(R.id.image_rename)
     }
 }

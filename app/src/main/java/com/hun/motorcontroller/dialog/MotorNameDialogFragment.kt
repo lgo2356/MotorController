@@ -20,7 +20,6 @@ class MotorNameDialogFragment : DialogFragment() {
 
     private val motors = ArrayList<Motor>()
     private val motorNameRecyclerAdapter = MotorNameRecyclerAdapter(motors)
-//    private var motorNameRecycler: RecyclerView? = null
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val inflater = requireActivity().layoutInflater
@@ -42,16 +41,6 @@ class MotorNameDialogFragment : DialogFragment() {
                     val motorName = motorNameRecyclerAdapter.getName(i)
                     setMotorName(motorName)
                 }
-//                    (fragmentActivity as MainActivity).getMotorAdapter()?.apply {
-//                        for (i in 0 until count) {
-//                            val motorName = motorNameRecyclerAdapter.getName(i)
-//                            setMotorName(motorName)
-////                            motorName?.let { name ->
-////                                if (name.isNotEmpty()) this.addItem(name)
-////                                else this.addItem("Empty Name")
-////                            } ?: this.addItem("Empty Name")
-//                        }
-//                    }
             }
             .setNegativeButton("취소") { _, _ -> }
 
@@ -66,7 +55,7 @@ class MotorNameDialogFragment : DialogFragment() {
                 motor.id = maxId?.plus(1) ?: 0
 
                 if (name.isNotEmpty()) motor.name = name
-                else motor.name = "Empty"
+                else motor.name = "Motor"
 
                 realm.copyToRealm(motor)
             }
