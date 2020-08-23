@@ -17,13 +17,16 @@ import com.hun.motorcontroller.R
 import com.hun.motorcontroller.data.Motor
 import io.realm.Realm
 
-class MotorRecyclerAdapter : RecyclerView.Adapter<MotorRecyclerAdapter.ViewHolder>() {
+class MotorRecyclerAdapter(val checkedArray: Array<Boolean>) :
+    RecyclerView.Adapter<MotorRecyclerAdapter.ViewHolder>() {
 
     var motors: List<Motor> = listOf()
         set(value) {
             field = value
             notifyDataSetChanged()
         }
+    private val buttons: Array<Button?> = arrayOfNulls(16)
+    private val toggles: Array<ToggleButton?> = arrayOfNulls(16)
 
     private var touchListener: OnItemTouchListener? = null
     private var buttonTouchListener: OnButtonTouchListener? = null
@@ -59,7 +62,11 @@ class MotorRecyclerAdapter : RecyclerView.Adapter<MotorRecyclerAdapter.ViewHolde
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        buttons[position] = holder.buttonSendData
+        toggles[position] = holder.toggleSendData
+
         holder.textMotorName.text = motors[position].name
+        holder.toggleSendData.isChecked = checkedArray[position]
 
         holder.imageBin.setOnClickListener {
             deleteMotor(position)
@@ -72,15 +79,21 @@ class MotorRecyclerAdapter : RecyclerView.Adapter<MotorRecyclerAdapter.ViewHolde
         holder.buttonSendData.setOnTouchListener { view, motionEvent ->
             when (motionEvent.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    buttonTouchListener?.onButtonTouchActionDown(view, motionEvent, position)
+                    if (!holder.toggleSendData.isChecked) {
+                        buttonTouchListener?.onButtonTouchActionDown(view, motionEvent, position)
+                    }
                 }
 
                 MotionEvent.ACTION_UP -> {
-                    buttonTouchListener?.onButtonTouchActionUp(view, motionEvent, position)
+                    if (!holder.toggleSendData.isChecked) {
+                        buttonTouchListener?.onButtonTouchActionUp(view, motionEvent, position)
+                    }
                 }
 
                 MotionEvent.ACTION_CANCEL -> {
-                    buttonTouchListener?.onButtonTouchActionCancel(view, motionEvent, position)
+                    if (!holder.toggleSendData.isChecked) {
+                        buttonTouchListener?.onButtonTouchActionCancel(view, motionEvent, position)
+                    }
                 }
             }
             false
@@ -89,24 +102,26 @@ class MotorRecyclerAdapter : RecyclerView.Adapter<MotorRecyclerAdapter.ViewHolde
         holder.toggleSendData.setOnClickListener {
             toggleClickListener?.onToggleClick(it, position, holder.toggleSendData.isChecked)
         }
-
-//        holder.itemView.setOnTouchListener { view, motionEvent ->
-//            when (motionEvent.action) {
-//                MotionEvent.ACTION_DOWN -> {
-//                    touchListener?.onItemTouchActionDown(view, motionEvent, position)
-//                }
-//
-//                MotionEvent.ACTION_UP -> {
-//                    view.performClick()
-//                    touchListener?.onItemTouchActionUp(view, motionEvent, position)
-//                }
-//            }
-//            true
-//        }
     }
 
     override fun getItemCount(): Int {
         return motors.size
+    }
+
+    fun getButton(position: Int): Button? {
+        if (buttons[position] == null) {
+            return null
+        }
+
+        return buttons[position]
+    }
+
+    fun getToggleButton(position: Int): ToggleButton? {
+        if (toggles[position] == null) {
+            return null
+        }
+
+        return toggles[position]
     }
 
     private fun deleteMotor(position: Int) {

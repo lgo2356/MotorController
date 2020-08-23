@@ -16,7 +16,7 @@ import com.hun.motorcontroller.recycler_adapter.MotorRecyclerAdapter
 import io.realm.Realm
 import java.lang.IllegalStateException
 
-private const val MAX_MOTOR_COUNT = 15
+private const val MAX_MOTOR_COUNT = 16
 
 class MotorSettingDialogFragment : DialogFragment() {
 

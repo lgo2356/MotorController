@@ -51,35 +51,43 @@ class BluetoothService(private val handler: Handler) {
     }
 
     fun writeBytes(bytes: ByteArray) {
-        writeBytesScope.launch(Dispatchers.IO) {
-            try {
-                mOutputStream?.write(bytes) ?: sendErrorMessage("패킷 전송에 실패했습니다")
-            } catch (e: IOException) {
-                Log.d("Debug", "패킷 전송에 실패했습니다")
-                writeBytesJob.cancel()
-                throw IOException()
-            }
+//        writeBytesScope.launch(Dispatchers.IO) {
+//            try {
+//                mOutputStream?.write(bytes) ?: sendErrorMessage("패킷 전송에 실패했습니다")
+//            } catch (e: IOException) {
+//                Log.d("Debug", "패킷 전송에 실패했습니다")
+//                writeBytesJob.cancel()
+//                throw IOException()
+//            }
+//        }
+        try {
+            mOutputStream?.write(bytes) ?: sendErrorMessage("패킷 전송에 실패했습니다")
+        } catch (e: IOException) {
+            Log.d("Debug", "패킷 전송에 실패했습니다")
+            val msg = handler.obtainMessage(Constants.MESSAGE_ERROR, "데이터 전송에 실패했습니다")
+            msg.sendToTarget()
+            throw IOException()
         }
     }
 
-    fun writeByte(byte: Int) {
-        writeByteScope.launch(Dispatchers.IO) {
-            try {
-                mOutputStream?.write(byte) ?: sendErrorMessage("패킷 전송에 실패했습니다")
-
-                val writeMsg = handler.obtainMessage(Constants.MESSAGE_WRITE, byte)
-                writeMsg.sendToTarget()
-                Log.d("Debug", "데이타 전송에 성공했습니다")
-            } catch (e: IOException) {
-                Log.d("Debug", "데이타 전송에 실패했습니다")
-                writeByteJob.cancel()
-                val errorMessage = handler.obtainMessage(Constants.MESSAGE_TOAST, "패킷 전송에 실패했습니다")
-                errorMessage.sendToTarget()
-
-                throw IOException()
-            }
-        }
-    }
+//    fun writeByte(byte: Int) {
+//        writeByteScope.launch(Dispatchers.IO) {
+//            try {
+//                mOutputStream?.write(byte) ?: sendErrorMessage("패킷 전송에 실패했습니다")
+//
+//                val writeMsg = handler.obtainMessage(Constants.MESSAGE_WRITE, byte)
+//                writeMsg.sendToTarget()
+//                Log.d("Debug", "데이타 전송에 성공했습니다")
+//            } catch (e: IOException) {
+//                Log.d("Debug", "데이타 전송에 실패했습니다")
+//                writeByteJob.cancel()
+//                val errorMessage = handler.obtainMessage(Constants.MESSAGE_TOAST, "패킷 전송에 실패했습니다")
+//                errorMessage.sendToTarget()
+//
+//                throw IOException()
+//            }
+//        }
+//    }
 
     fun startRead() {
         readScope.launch(Dispatchers.IO) {

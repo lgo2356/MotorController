@@ -1,7 +1,6 @@
 package com.hun.motorcontroller
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -15,13 +14,11 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
-import android.widget.EditText
 import android.widget.Toast
 import android.widget.ToggleButton
 import com.google.android.material.snackbar.Snackbar
 import com.hun.motorcontroller.data.Motor
 import com.hun.motorcontroller.dialog.BluetoothDialogFragment
-import com.hun.motorcontroller.dialog.MotorNameDialogFragment
 import com.hun.motorcontroller.dialog.MotorRenameDialogFragment
 import com.hun.motorcontroller.dialog.MotorSettingDialogFragment
 import com.hun.motorcontroller.recycler_adapter.MotorRecyclerAdapter
@@ -37,9 +34,28 @@ class MainActivity : AppCompatActivity() {
     private var isWriteButtonPressed = false
     private var isWriteToggled = false
 
+    private var isToggledArray: Array<Boolean> = arrayOf(
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+    )
+
     private val coroutineList: ArrayList<Job> = ArrayList()
 
-    private val motorAdapter: MotorRecyclerAdapter = MotorRecyclerAdapter()
+    private val motorAdapter: MotorRecyclerAdapter = MotorRecyclerAdapter(isToggledArray)
     private val motorRealm: Realm = Realm.getDefaultInstance()
 
     private lateinit var bluetoothService: BluetoothService
@@ -61,7 +77,7 @@ class MainActivity : AppCompatActivity() {
 //                    val readBytes: ByteArray = it.obj as ByteArray
 //                    val readString = String(readBytes, US_ASCII)
                     val readString: String = it.obj as String
-                    text_read.text = readString
+//                    text_read.text = readString
                 }
 
                 Constants.MESSAGE_WRITE -> {
@@ -69,7 +85,7 @@ class MainActivity : AppCompatActivity() {
                     val readByte: Int = it.obj as Int
 //                    val readString = String(readByte, US_ASCII)
                     val readString = readByte.toString()
-                    text_message.text = readString
+//                    text_message.text = readString
                 }
 
                 Constants.MESSAGE_TOAST -> {
@@ -79,9 +95,8 @@ class MainActivity : AppCompatActivity() {
 
                 Constants.MESSAGE_CONNECTED -> {
                     if (::bluetoothService.isInitialized) {
-                        Toast.makeText(applicationContext, "디바이스에 연결되었습니", Toast.LENGTH_SHORT).show()
-//                        bluetoothService.IOThread().start()
-                        bluetoothService.startRead()
+                        Toast.makeText(applicationContext, "디바이스에 연결되었습니다", Toast.LENGTH_SHORT).show()
+//                        bluetoothService.startRead()
 
                         setDeviceConnectingIcon(true)
                         bluetoothDialog.dismiss()
@@ -131,6 +146,9 @@ class MainActivity : AppCompatActivity() {
             override fun onButtonTouchActionDown(view: View, motionEvent: MotionEvent, position: Int) {
                 isWriteButtonPressed = true
 
+                val toggleButton = motorAdapter.getToggleButton(position)
+                toggleButton?.isEnabled = false
+
                 if (coroutineList.size > 0) {
                     for (job in coroutineList) {
                         job.cancel()
@@ -151,16 +169,25 @@ class MainActivity : AppCompatActivity() {
 
             override fun onButtonTouchActionUp(view: View, motionEvent: MotionEvent, position: Int) {
                 isWriteButtonPressed = false
+                val toggleButton = motorAdapter.getToggleButton(position)
+                toggleButton?.isEnabled = true
             }
 
             override fun onButtonTouchActionCancel(view: View, motionEvent: MotionEvent, position: Int) {
                 isWriteButtonPressed = false
+                val toggleButton = motorAdapter.getToggleButton(position)
+                toggleButton?.isEnabled = true
             }
         })
 
         motorAdapter.setOnToggleClickListener(object : MotorRecyclerAdapter.OnToggleClickListener {
             override fun onToggleClick(view: View, position: Int, isChecked: Boolean) {
                 isWriteToggled = (view as ToggleButton).isChecked
+                isToggledArray[position] = view.isChecked
+
+                val button = motorAdapter.getButton(position)
+
+                button?.isEnabled = !view.isChecked
 
                 if (coroutineList.size > 0) {
                     for (job in coroutineList) {
@@ -255,6 +282,48 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun getPositionByte(toggledArray: Array<Boolean>, state: Boolean): IntArray {
+        val upperBytes: Array<Int> = arrayOf(1, 2, 4, 8, 16, 32, 64, 128)
+        val lowerBytes: Array<Int> = arrayOf(1, 2, 4, 8, 16, 32, 64, 128)
+        var positionUpperByte = 0
+        var positionLowerByte = 0
+
+        for (i in 0 until 8) {
+            if (state) {
+                if (toggledArray[i]) {
+                    positionLowerByte += lowerBytes[i]
+                }
+            } else {
+                if (!toggledArray[i]) {
+                    positionLowerByte += lowerBytes[i]
+                }
+            }
+        }
+
+        for (i in 0 until 8) {
+            if (state) {
+                if (toggledArray[i+8]) {
+                    positionUpperByte += upperBytes[i]
+                }
+            } else {
+                if (!toggledArray[i+8]) {
+                    positionUpperByte += upperBytes[i]
+                }
+            }
+        }
+
+        return intArrayOf(positionUpperByte, positionLowerByte)
+    }
+
+    private fun makePacketBytes(operation: Boolean): ByteArray {
+        val state: Byte = if (operation) 0x01
+        else 0x00
+
+        val positionBytes: IntArray = getPositionByte(isToggledArray, operation)
+
+        return byteArrayOf(0x68, positionBytes[0].toByte(), positionBytes[1].toByte(), state, 0x7E)
+    }
+
     private fun sendPacketManually(position: Int) {
         val writeManuallyScope = CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -263,12 +332,15 @@ class MainActivity : AppCompatActivity() {
                 while (bluetoothService.isConnected()) {
                     if (isWriteButtonPressed) {
                         Log.d("Debug", "Manual mode 1 - ${count++}")
-                        val bytes: ByteArray = byteArrayOf(0x68, position.toByte(), 0x01, 0x7E)
+
+                        val bytes = makePacketBytes(true)
                         bluetoothService.writeBytes(bytes)
                     } else {
                         Log.d("Debug", "Manual mode 2 - ${count++}")
-                        val bytes: ByteArray = byteArrayOf(0x68, position.toByte(), 0x00, 0x7E)
+
+                        val bytes = makePacketBytes(false)
                         bluetoothService.writeBytes(bytes)
+                        this.cancel()
                     }
                     delay(5)
                 }
@@ -288,12 +360,15 @@ class MainActivity : AppCompatActivity() {
                 while (bluetoothService.isConnected()) {
                     if (isWriteToggled) {
                         Log.d("Debug", "Auto mode 1 - ${count++}")
-                        val bytes: ByteArray = byteArrayOf(0x68, position.toByte(), 0x01, 0x7E)
+
+                        val bytes = makePacketBytes(true)
                         bluetoothService.writeBytes(bytes)
                     } else {
                         Log.d("Debug", "Auto mode 2 - ${count++}")
-                        val bytes: ByteArray = byteArrayOf(0x68, position.toByte(), 0x00, 0x7E)
+
+                        val bytes = makePacketBytes(false)
                         bluetoothService.writeBytes(bytes)
+                        this.cancel()
                     }
                     delay(5)
                 }
