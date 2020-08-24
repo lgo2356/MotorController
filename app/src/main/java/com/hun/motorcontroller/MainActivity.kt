@@ -14,6 +14,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
+import android.widget.Button
 import android.widget.Toast
 import android.widget.ToggleButton
 import com.google.android.material.snackbar.Snackbar
@@ -33,6 +34,8 @@ class MainActivity : AppCompatActivity() {
 
     private var isWriteButtonPressed = false
     private var isWriteToggled = false
+    private var isWriting = false
+    private var isAllOff = true
 
     private var isToggledArray: Array<Boolean> = arrayOf(
         false,
@@ -54,6 +57,7 @@ class MainActivity : AppCompatActivity() {
     )
 
     private val coroutineList: ArrayList<Job> = ArrayList()
+//    private var writeAutomaticallyScope = CoroutineScope(Dispatchers.IO)
 
     private val motorAdapter: MotorRecyclerAdapter = MotorRecyclerAdapter(isToggledArray)
     private val motorRealm: Realm = Realm.getDefaultInstance()
@@ -146,6 +150,7 @@ class MainActivity : AppCompatActivity() {
             override fun onButtonTouchActionDown(view: View, motionEvent: MotionEvent, position: Int) {
                 isWriteButtonPressed = true
 
+                // Set button non-clickable
                 val toggleButton = motorAdapter.getToggleButton(position)
                 toggleButton?.isEnabled = false
 
@@ -185,20 +190,43 @@ class MainActivity : AppCompatActivity() {
                 isWriteToggled = (view as ToggleButton).isChecked
                 isToggledArray[position] = view.isChecked
 
-                val button = motorAdapter.getButton(position)
-
-                button?.isEnabled = !view.isChecked
-
-                if (coroutineList.size > 0) {
-                    for (job in coroutineList) {
-                        job.cancel()
-                    }
-                    coroutineList.clear()
+//                val button = motorAdapter.getButton(position)
+                val buttons: ArrayList<Button> = ArrayList()
+                for (i in 0 until motorAdapter.itemCount) {
+                    motorAdapter.getButton(position)?.let { buttons.add(it) }
                 }
+
+                for (button in buttons) {
+                    button.isEnabled = !view.isChecked
+                }
+
+                // Toggle 된 버튼이 하나라도 있으면
+                val onOff = view.isChecked
+
+                isAllOff = true
+                for (isToggled in isToggledArray) {
+                    if (isToggled) {
+                        isAllOff = false
+                        break
+                    }
+                }
+
+//                button?.isEnabled = !view.isChecked
+
+//                if (coroutineList.size > 0) {
+//                    for (job in coroutineList) {
+//                        job.cancel()
+//                    }
+//                    coroutineList.clear()
+//                }
 
                 if (::bluetoothService.isInitialized) {
                     if (bluetoothService.isConnected()) {
-                        sendPacketAutomatically(position)
+                        if (onOff && !isWriting) {
+                            sendPacketAutomatically(position, onOff)
+                        } else {
+                            sendStopPacket()
+                        }
                     } else {
                         showSnackBar("블루투스를 연결해주세요")
                     }
@@ -282,14 +310,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun getPositionByte(toggledArray: Array<Boolean>, state: Boolean): IntArray {
+    private fun getPositionByte(toggledArray: Array<Boolean>, onOff: Boolean): IntArray {
         val upperBytes: Array<Int> = arrayOf(1, 2, 4, 8, 16, 32, 64, 128)
         val lowerBytes: Array<Int> = arrayOf(1, 2, 4, 8, 16, 32, 64, 128)
         var positionUpperByte = 0
         var positionLowerByte = 0
 
         for (i in 0 until 8) {
-            if (state) {
+            if (onOff) {
                 if (toggledArray[i]) {
                     positionLowerByte += lowerBytes[i]
                 }
@@ -301,12 +329,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         for (i in 0 until 8) {
-            if (state) {
-                if (toggledArray[i+8]) {
+            if (onOff) {
+                if (toggledArray[i + 8]) {
                     positionUpperByte += upperBytes[i]
                 }
             } else {
-                if (!toggledArray[i+8]) {
+                if (!toggledArray[i + 8]) {
                     positionUpperByte += upperBytes[i]
                 }
             }
@@ -315,11 +343,11 @@ class MainActivity : AppCompatActivity() {
         return intArrayOf(positionUpperByte, positionLowerByte)
     }
 
-    private fun makePacketBytes(operation: Boolean): ByteArray {
-        val state: Byte = if (operation) 0x01
+    private fun makePacketBytes(onOff: Boolean): ByteArray {
+        val state: Byte = if (onOff) 0x01
         else 0x00
 
-        val positionBytes: IntArray = getPositionByte(isToggledArray, operation)
+        val positionBytes: IntArray = getPositionByte(isToggledArray, onOff)
 
         return byteArrayOf(0x68, positionBytes[0].toByte(), positionBytes[1].toByte(), state, 0x7E)
     }
@@ -352,32 +380,67 @@ class MainActivity : AppCompatActivity() {
         coroutineList.add(writeManuallyScope)
     }
 
-    private fun sendPacketAutomatically(position: Int) {
-        val writeAutomaticallyScope = CoroutineScope(Dispatchers.IO).launch {
+    private fun sendPacketAutomatically(position: Int, onOff: Boolean) {
+        CoroutineScope(Dispatchers.IO).launch {
             try {
                 var count = 0
 
-                while (bluetoothService.isConnected()) {
-                    if (isWriteToggled) {
-                        Log.d("Debug", "Auto mode 1 - ${count++}")
+                while (bluetoothService.isConnected() && !isAllOff) {
+                    isWriting = true
+                    Log.d("Debug", "Auto mode 1 - ${count++}")
 
-                        val bytes = makePacketBytes(true)
-                        bluetoothService.writeBytes(bytes)
-                    } else {
-                        Log.d("Debug", "Auto mode 2 - ${count++}")
+                    val bytes = makePacketBytes(onOff)
+//                    bluetoothService.writeBytes(bytes)
 
-                        val bytes = makePacketBytes(false)
-                        bluetoothService.writeBytes(bytes)
-                        this.cancel()
-                    }
                     delay(5)
                 }
+
+                isWriting = false
             } catch (e: IOException) {
                 Log.d("Debug", "Error from writeAutomaticallyScope", e)
+                isWriting = false
                 this.cancel()
             }
         }
-        coroutineList.add(writeAutomaticallyScope)
+//        val writeAutomaticallyScope = CoroutineScope(Dispatchers.IO).launch {
+//            try {
+//                var count = 0
+//
+//                while (bluetoothService.isConnected()) {
+//                    if (isWriteToggled) {
+//                        Log.d("Debug", "Auto mode 1 - ${count++}")
+//
+//                        val bytes = makePacketBytes(true)
+////                        bluetoothService.writeBytes(bytes)
+//                    } else {
+//                        Log.d("Debug", "Auto mode 2 - ${count++}")
+//
+//                        val bytes = makePacketBytes(false)
+////                        bluetoothService.writeBytes(bytes)
+////                        this.cancel()
+//                    }
+//                    delay(5)
+//                }
+//            } catch (e: IOException) {
+//                Log.d("Debug", "Error from writeAutomaticallyScope", e)
+//                this.cancel()
+//            }
+//        }
+//        coroutineList.add(writeAutomaticallyScope)
+    }
+
+    private fun sendStopPacket() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                Log.d("Debug", "Write stop packet")
+
+                val packet = makePacketBytes(false)
+                bluetoothService.writeBytes(packet)
+            } catch (e: IOException) {
+                e.printStackTrace()
+                this.cancel()
+            }
+        }
     }
 
     private fun showSnackBar(message: String) {
