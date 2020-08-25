@@ -116,12 +116,20 @@ class MotorRecyclerAdapter(val checkedArray: Array<Boolean>) :
         return buttons[position]
     }
 
+    fun getButtons(): Array<Button?> {
+        return buttons
+    }
+
     fun getToggleButton(position: Int): ToggleButton? {
         if (toggles[position] == null) {
             return null
         }
 
         return toggles[position]
+    }
+
+    fun getToggleButtons(): Array<ToggleButton?> {
+        return toggles
     }
 
     private fun deleteMotor(position: Int) {

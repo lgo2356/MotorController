@@ -151,8 +151,20 @@ class MainActivity : AppCompatActivity() {
                 isWriteButtonPressed = true
 
                 // Set button non-clickable
-                val toggleButton = motorAdapter.getToggleButton(position)
-                toggleButton?.isEnabled = false
+//                val toggleButton = motorAdapter.getToggleButton(position)
+//                toggleButton?.isEnabled = false
+
+                val toggleButtons = motorAdapter.getToggleButtons()
+                for (toggleButton in toggleButtons) {
+                    toggleButton?.isEnabled = false
+                }
+
+                val buttons = motorAdapter.getButtons()
+                for (i in 0 until motorAdapter.itemCount) {
+                    if (i != position) {
+                        buttons[i]?.isEnabled = false
+                    }
+                }
 
                 if (coroutineList.size > 0) {
                     for (job in coroutineList) {
@@ -174,14 +186,35 @@ class MainActivity : AppCompatActivity() {
 
             override fun onButtonTouchActionUp(view: View, motionEvent: MotionEvent, position: Int) {
                 isWriteButtonPressed = false
-                val toggleButton = motorAdapter.getToggleButton(position)
-                toggleButton?.isEnabled = true
+//                val toggleButton = motorAdapter.getToggleButton(position)
+//                toggleButton?.isEnabled = true
+                val toggleButtons = motorAdapter.getToggleButtons()
+                for (toggleButton in toggleButtons) {
+                    toggleButton?.isEnabled = true
+                }
+
+                val buttons = motorAdapter.getButtons()
+                for (i in 0 until motorAdapter.itemCount) {
+                    if (i != position) {
+                        buttons[i]?.isEnabled = true
+                    }
+                }
             }
 
             override fun onButtonTouchActionCancel(view: View, motionEvent: MotionEvent, position: Int) {
                 isWriteButtonPressed = false
-                val toggleButton = motorAdapter.getToggleButton(position)
-                toggleButton?.isEnabled = true
+
+                val toggleButtons = motorAdapter.getToggleButtons()
+                for (toggleButton in toggleButtons) {
+                    toggleButton?.isEnabled = true
+                }
+
+                val buttons = motorAdapter.getButtons()
+                for (i in 0 until motorAdapter.itemCount) {
+                    if (i != position) {
+                        buttons[i]?.isEnabled = true
+                    }
+                }
             }
         })
 
@@ -190,15 +223,7 @@ class MainActivity : AppCompatActivity() {
                 isWriteToggled = (view as ToggleButton).isChecked
                 isToggledArray[position] = view.isChecked
 
-//                val button = motorAdapter.getButton(position)
-                val buttons: ArrayList<Button> = ArrayList()
-                for (i in 0 until motorAdapter.itemCount) {
-                    motorAdapter.getButton(position)?.let { buttons.add(it) }
-                }
-
-                for (button in buttons) {
-                    button.isEnabled = !view.isChecked
-                }
+                setButtonsClickable()
 
                 // Toggle 된 버튼이 하나라도 있으면
                 val onOff = view.isChecked
@@ -210,15 +235,6 @@ class MainActivity : AppCompatActivity() {
                         break
                     }
                 }
-
-//                button?.isEnabled = !view.isChecked
-
-//                if (coroutineList.size > 0) {
-//                    for (job in coroutineList) {
-//                        job.cancel()
-//                    }
-//                    coroutineList.clear()
-//                }
 
                 if (::bluetoothService.isInitialized) {
                     if (bluetoothService.isConnected()) {
@@ -255,16 +271,6 @@ class MainActivity : AppCompatActivity() {
             image_lamp.setImageResource(R.drawable.bluetooth_state_disconnected_shape)
         }
     }
-
-//    private fun clearMotorList() {
-//        Realm.getDefaultInstance().use {
-//            val results = it.where(Motor::class.java).findAll()
-//
-//            it.executeTransaction {
-//                results.deleteAllFromRealm()
-//            }
-//        }
-//    }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.toolbar_main, menu)
@@ -310,6 +316,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Packet
+     */
     private fun getPositionByte(toggledArray: Array<Boolean>, onOff: Boolean): IntArray {
         val upperBytes: Array<Int> = arrayOf(1, 2, 4, 8, 16, 32, 64, 128)
         val lowerBytes: Array<Int> = arrayOf(1, 2, 4, 8, 16, 32, 64, 128)
@@ -390,7 +399,7 @@ class MainActivity : AppCompatActivity() {
                     Log.d("Debug", "Auto mode 1 - ${count++}")
 
                     val bytes = makePacketBytes(onOff)
-//                    bluetoothService.writeBytes(bytes)
+                    bluetoothService.writeBytes(bytes)
 
                     delay(5)
                 }
@@ -402,31 +411,6 @@ class MainActivity : AppCompatActivity() {
                 this.cancel()
             }
         }
-//        val writeAutomaticallyScope = CoroutineScope(Dispatchers.IO).launch {
-//            try {
-//                var count = 0
-//
-//                while (bluetoothService.isConnected()) {
-//                    if (isWriteToggled) {
-//                        Log.d("Debug", "Auto mode 1 - ${count++}")
-//
-//                        val bytes = makePacketBytes(true)
-////                        bluetoothService.writeBytes(bytes)
-//                    } else {
-//                        Log.d("Debug", "Auto mode 2 - ${count++}")
-//
-//                        val bytes = makePacketBytes(false)
-////                        bluetoothService.writeBytes(bytes)
-////                        this.cancel()
-//                    }
-//                    delay(5)
-//                }
-//            } catch (e: IOException) {
-//                Log.d("Debug", "Error from writeAutomaticallyScope", e)
-//                this.cancel()
-//            }
-//        }
-//        coroutineList.add(writeAutomaticallyScope)
     }
 
     private fun sendStopPacket() {
@@ -443,11 +427,39 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * View
+     */
+    private fun setButtonsClickable() {
+        val buttons = motorAdapter.getButtons()
+        var isAllOff = true
+
+        for (isToggled in isToggledArray) {
+            if (isToggled) {
+                isAllOff = false
+                break
+            }
+        }
+
+        if (!isAllOff) {
+            for (button in buttons) button?.isEnabled = false
+        } else {
+            for (button in buttons) button?.isEnabled = true
+        }
+    }
+
+    private fun setToggleButtonClickable() {
+        val toggleButtons = motorAdapter.getToggleButtons()
+    }
+
     private fun showSnackBar(message: String) {
         val snackBar = Snackbar.make(container_main, message, Snackbar.LENGTH_INDEFINITE)
         snackBar.setAction("확인") { snackBar.dismiss() }.show()
     }
 
+    /**
+     * Receiver
+     */
     private fun registerBluetoothReceiver() {
         val filter = IntentFilter().apply {
             addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
@@ -467,6 +479,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Life cycle
+     */
     override fun onStart() {
         super.onStart()
         Log.d("Debug", "onStart")
