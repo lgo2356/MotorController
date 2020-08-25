@@ -19,6 +19,7 @@ import android.widget.Toast
 import android.widget.ToggleButton
 import com.google.android.material.snackbar.Snackbar
 import com.hun.motorcontroller.data.Motor
+import com.hun.motorcontroller.data.MotorItem
 import com.hun.motorcontroller.dialog.BluetoothDialogFragment
 import com.hun.motorcontroller.dialog.MotorRenameDialogFragment
 import com.hun.motorcontroller.dialog.MotorSettingDialogFragment
@@ -57,9 +58,9 @@ class MainActivity : AppCompatActivity() {
     )
 
     private val coroutineList: ArrayList<Job> = ArrayList()
-//    private var writeAutomaticallyScope = CoroutineScope(Dispatchers.IO)
 
-    private val motorAdapter: MotorRecyclerAdapter = MotorRecyclerAdapter(isToggledArray)
+    private val motorItems: ArrayList<MotorItem> = ArrayList()
+    private val motorAdapter: MotorRecyclerAdapter = MotorRecyclerAdapter(motorItems)
     private val motorRealm: Realm = Realm.getDefaultInstance()
 
     private lateinit var bluetoothService: BluetoothService
@@ -141,6 +142,10 @@ class MainActivity : AppCompatActivity() {
         motorAdapter.motors = motorRealm.where(Motor::class.java).findAll()
         motorRealm.addChangeListener { motorAdapter.notifyDataSetChanged() }
 
+        for (motor in motorAdapter.motors) {
+            motorAdapter.addItem(motor.name, true, true, false)
+        }
+
         if (motorAdapter.motors.isEmpty()) {
             val motorSettingDialog = MotorSettingDialogFragment()
             motorSettingDialog.show(supportFragmentManager, "missiles")
@@ -154,17 +159,17 @@ class MainActivity : AppCompatActivity() {
 //                val toggleButton = motorAdapter.getToggleButton(position)
 //                toggleButton?.isEnabled = false
 
-                val toggleButtons = motorAdapter.getToggleButtons()
-                for (toggleButton in toggleButtons) {
-                    toggleButton?.isEnabled = false
-                }
-
-                val buttons = motorAdapter.getButtons()
-                for (i in 0 until motorAdapter.itemCount) {
-                    if (i != position) {
-                        buttons[i]?.isEnabled = false
-                    }
-                }
+//                val toggleButtons = motorAdapter.getToggleButtons()
+//                for (toggleButton in toggleButtons) {
+//                    toggleButton?.isEnabled = false
+//                }
+//
+//                val buttons = motorAdapter.getButtons()
+//                for (i in 0 until motorAdapter.itemCount) {
+//                    if (i != position) {
+//                        buttons[i]?.isEnabled = false
+//                    }
+//                }
 
                 if (coroutineList.size > 0) {
                     for (job in coroutineList) {
@@ -186,44 +191,46 @@ class MainActivity : AppCompatActivity() {
 
             override fun onButtonTouchActionUp(view: View, motionEvent: MotionEvent, position: Int) {
                 isWriteButtonPressed = false
+
 //                val toggleButton = motorAdapter.getToggleButton(position)
 //                toggleButton?.isEnabled = true
-                val toggleButtons = motorAdapter.getToggleButtons()
-                for (toggleButton in toggleButtons) {
-                    toggleButton?.isEnabled = true
-                }
-
-                val buttons = motorAdapter.getButtons()
-                for (i in 0 until motorAdapter.itemCount) {
-                    if (i != position) {
-                        buttons[i]?.isEnabled = true
-                    }
-                }
+//                val toggleButtons = motorAdapter.getToggleButtons()
+//                for (toggleButton in toggleButtons) {
+//                    toggleButton?.isEnabled = true
+//                }
+//
+//                val buttons = motorAdapter.getButtons()
+//                for (i in 0 until motorAdapter.itemCount) {
+//                    if (i != position) {
+//                        buttons[i]?.isEnabled = true
+//                    }
+//                }
             }
 
             override fun onButtonTouchActionCancel(view: View, motionEvent: MotionEvent, position: Int) {
                 isWriteButtonPressed = false
 
-                val toggleButtons = motorAdapter.getToggleButtons()
-                for (toggleButton in toggleButtons) {
-                    toggleButton?.isEnabled = true
-                }
-
-                val buttons = motorAdapter.getButtons()
-                for (i in 0 until motorAdapter.itemCount) {
-                    if (i != position) {
-                        buttons[i]?.isEnabled = true
-                    }
-                }
+//                val toggleButtons = motorAdapter.getToggleButtons()
+//                for (toggleButton in toggleButtons) {
+//                    toggleButton?.isEnabled = true
+//                }
+//
+//                val buttons = motorAdapter.getButtons()
+//                for (i in 0 until motorAdapter.itemCount) {
+//                    if (i != position) {
+//                        buttons[i]?.isEnabled = true
+//                    }
+//                }
             }
         })
 
         motorAdapter.setOnToggleClickListener(object : MotorRecyclerAdapter.OnToggleClickListener {
             override fun onToggleClick(view: View, position: Int, isChecked: Boolean) {
                 isWriteToggled = (view as ToggleButton).isChecked
-                isToggledArray[position] = view.isChecked
+//                isToggledArray[position] = view.isChecked
+                motorAdapter.setToggleButtonIsChecked(position, view.isChecked)
 
-                setButtonsClickable()
+//                setButtonsClickable()
 
                 // Toggle 된 버튼이 하나라도 있으면
                 val onOff = view.isChecked
@@ -430,27 +437,33 @@ class MainActivity : AppCompatActivity() {
     /**
      * View
      */
-    private fun setButtonsClickable() {
-        val buttons = motorAdapter.getButtons()
-        var isAllOff = true
-
-        for (isToggled in isToggledArray) {
-            if (isToggled) {
-                isAllOff = false
-                break
-            }
-        }
-
-        if (!isAllOff) {
-            for (button in buttons) button?.isEnabled = false
-        } else {
-            for (button in buttons) button?.isEnabled = true
-        }
-    }
-
-    private fun setToggleButtonClickable() {
-        val toggleButtons = motorAdapter.getToggleButtons()
-    }
+//    private fun setButtonsClickable() {
+//        val buttons = motorAdapter.getButtons()
+//        var isAllOff = true
+//
+//        for (isToggled in isToggledArray) {
+//            if (isToggled) {
+//                isAllOff = false
+//                break
+//            }
+//        }
+//
+//        if (!isAllOff) {
+//            for (button in buttons) {
+//                button?.isEnabled = false
+//
+//                if (button == null) {
+//                    Log.d("Debug", "Button is null...")
+//                }
+//            }
+//        } else {
+//            for (button in buttons) button?.isEnabled = true
+//        }
+//    }
+//
+//    private fun setToggleButtonClickable() {
+//        val toggleButtons = motorAdapter.getToggleButtons()
+//    }
 
     private fun showSnackBar(message: String) {
         val snackBar = Snackbar.make(container_main, message, Snackbar.LENGTH_INDEFINITE)
