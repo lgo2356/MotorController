@@ -155,37 +155,32 @@ class MainActivity : AppCompatActivity() {
             override fun onButtonTouchActionDown(view: View, motionEvent: MotionEvent, position: Int) {
                 isWriteButtonPressed = true
 
-                // Set button non-clickable
-//                val toggleButton = motorAdapter.getToggleButton(position)
-//                toggleButton?.isEnabled = false
-
-//                val toggleButtons = motorAdapter.getToggleButtons()
-//                for (toggleButton in toggleButtons) {
-//                    toggleButton?.isEnabled = false
-//                }
-//
-//                val buttons = motorAdapter.getButtons()
-//                for (i in 0 until motorAdapter.itemCount) {
-//                    if (i != position) {
-//                        buttons[i]?.isEnabled = false
-//                    }
-//                }
-
-                if (coroutineList.size > 0) {
-                    for (job in coroutineList) {
-                        job.cancel()
+                isAllOff = true
+                for (isToggled in isToggledArray) {
+                    if (isToggled) {
+                        isAllOff = false
                     }
-                    coroutineList.clear()
                 }
 
-                if (::bluetoothService.isInitialized) {
-                    if (bluetoothService.isConnected()) {
-                        sendPacketManually(position)
+                if (isAllOff) {
+                    if (coroutineList.size > 0) {
+                        for (job in coroutineList) {
+                            job.cancel()
+                        }
+                        coroutineList.clear()
+                    }
+
+                    if (::bluetoothService.isInitialized) {
+                        if (bluetoothService.isConnected()) {
+                            sendPacketManually(position)
+                        } else {
+                            showSnackBar("블루투스를 연결해주세요")
+                        }
                     } else {
-                        showSnackBar("블루투스를 연결해주세요")
+                        Toast.makeText(applicationContext, "Late init exception", Toast.LENGTH_SHORT).show()
                     }
                 } else {
-                    Toast.makeText(applicationContext, "Late init exception", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(applicationContext, "자동 모드 on인 버튼이 존재합니다", Toast.LENGTH_SHORT).show()
                 }
             }
 
@@ -323,6 +318,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun isAllToggleButtonOff(): Boolean {
+        isAllOff = true
+        for (isToggled in isToggledArray) {
+            if (isToggled) {
+                isAllOff = false
+            }
+        }
+        return isAllOff
+    }
+
     /**
      * Packet
      */
@@ -368,6 +373,23 @@ class MainActivity : AppCompatActivity() {
         return byteArrayOf(0x68, positionBytes[0].toByte(), positionBytes[1].toByte(), state, 0x7E)
     }
 
+    private fun makePacketBytes(position: Int, onOff: Boolean): ByteArray {
+        val bytes: Array<Int> = arrayOf(1, 2, 4, 8, 16, 32, 64, 128)
+        var upperByte = 0
+        var lowerByte = 0
+
+        val state: Byte = if (onOff) 0x01
+        else 0x00
+
+        if (position < 8) {
+            lowerByte = bytes[position]
+        } else if (position < 16) {
+            upperByte = bytes[position - 8]
+        }
+
+        return byteArrayOf(0x68, upperByte.toByte(), lowerByte.toByte(), state, 0x7E)
+    }
+
     private fun sendPacketManually(position: Int) {
         val writeManuallyScope = CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -377,12 +399,12 @@ class MainActivity : AppCompatActivity() {
                     if (isWriteButtonPressed) {
                         Log.d("Debug", "Manual mode 1 - ${count++}")
 
-                        val bytes = makePacketBytes(true)
+                        val bytes = makePacketBytes(position, true)
                         bluetoothService.writeBytes(bytes)
                     } else {
                         Log.d("Debug", "Manual mode 2 - ${count++}")
 
-                        val bytes = makePacketBytes(false)
+                        val bytes = makePacketBytes(position, false)
                         bluetoothService.writeBytes(bytes)
                         this.cancel()
                     }
