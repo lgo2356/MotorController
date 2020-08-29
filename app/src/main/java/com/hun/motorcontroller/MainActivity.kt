@@ -222,7 +222,7 @@ class MainActivity : AppCompatActivity() {
         motorAdapter.setOnToggleClickListener(object : MotorRecyclerAdapter.OnToggleClickListener {
             override fun onToggleClick(view: View, position: Int, isChecked: Boolean) {
                 isWriteToggled = (view as ToggleButton).isChecked
-//                isToggledArray[position] = view.isChecked
+                isToggledArray[position] = view.isChecked
                 motorAdapter.setToggleButtonIsChecked(position, view.isChecked)
 
 //                setButtonsClickable()
@@ -423,7 +423,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 var count = 0
 
-                while (bluetoothService.isConnected() && !isAllOff) {
+                while (bluetoothService.isConnected() && !isAllToggleButtonOff()) {
                     isWriting = true
                     Log.d("Debug", "Auto mode 1 - ${count++}")
 
