@@ -15,27 +15,17 @@ import android.os.Bundle
 import android.os.Handler
 import android.util.Log
 import android.view.View
-import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.ProgressBar
-import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.FragmentActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.bumptech.glide.Glide
 import com.hun.motorcontroller.*
-import com.hun.motorcontroller.data.BTS
 import com.hun.motorcontroller.data.Device
 import com.hun.motorcontroller.recycler_adapter.BTDialogRecyclerAdapter
-import io.reactivex.Observable
 import io.reactivex.disposables.Disposable
-import io.reactivex.schedulers.Schedulers
-import kotlinx.android.synthetic.main.layout_bluetooth_device_item.view.*
-import kotlinx.android.synthetic.main.layout_bluetooth_dialog.*
-import java.io.IOException
 import java.lang.IllegalArgumentException
 import java.lang.IllegalStateException
 import kotlin.collections.ArrayList
@@ -44,7 +34,6 @@ class BluetoothDialogFragment(private val handler: Handler) : DialogFragment() {
 
     private val btPairedDevices: ArrayList<Device> = ArrayList()
     private val btDiscoveredDevices: ArrayList<Device> = ArrayList()
-    private val observableList: ObservableList<Device> = ObservableList()
     private val btDialogPairedAdapter = BTDialogRecyclerAdapter(btPairedDevices)
     private val btDialogDiscoveredAdapter = BTDialogRecyclerAdapter(btDiscoveredDevices)
     private var bluetoothAdapter: BluetoothAdapter? = null

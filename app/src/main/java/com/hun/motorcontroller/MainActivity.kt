@@ -186,36 +186,10 @@ class MainActivity : AppCompatActivity() {
 
             override fun onButtonTouchActionUp(view: View, motionEvent: MotionEvent, position: Int) {
                 isWriteButtonPressed = false
-
-//                val toggleButton = motorAdapter.getToggleButton(position)
-//                toggleButton?.isEnabled = true
-//                val toggleButtons = motorAdapter.getToggleButtons()
-//                for (toggleButton in toggleButtons) {
-//                    toggleButton?.isEnabled = true
-//                }
-//
-//                val buttons = motorAdapter.getButtons()
-//                for (i in 0 until motorAdapter.itemCount) {
-//                    if (i != position) {
-//                        buttons[i]?.isEnabled = true
-//                    }
-//                }
             }
 
             override fun onButtonTouchActionCancel(view: View, motionEvent: MotionEvent, position: Int) {
                 isWriteButtonPressed = false
-
-//                val toggleButtons = motorAdapter.getToggleButtons()
-//                for (toggleButton in toggleButtons) {
-//                    toggleButton?.isEnabled = true
-//                }
-//
-//                val buttons = motorAdapter.getButtons()
-//                for (i in 0 until motorAdapter.itemCount) {
-//                    if (i != position) {
-//                        buttons[i]?.isEnabled = true
-//                    }
-//                }
             }
         })
 
